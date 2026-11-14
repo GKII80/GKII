@@ -22,6 +22,7 @@ import {
   GalleryCategory,
   LiveNotification,
   OrganPelayanan,
+  SiteTextContent,
   VisionMission,
 } from '../types';
 import {
@@ -29,7 +30,9 @@ import {
   formatRupiah,
   toWhatsAppUrl,
 } from '../lib/dateAndFormat';
+import { mergeSiteContent } from '../lib/siteContentDefaults';
 import { ChurchGalleryModule } from './ChurchGalleryModule';
+import type { SiteTextEditorTab } from './SiteTextEditorModal';
 import {
   FOURFOLD_GOSPEL_SYMBOLS,
   GKII_OFFICIAL_LOGO_URL,
@@ -49,11 +52,13 @@ export type NavTabId =
 
 interface OverviewSectionProps {
   data: ChurchDatabase;
+  siteContent?: SiteTextContent;
   notifications: LiveNotification[];
   canEditAdmin: boolean;
   canUploadGallery: boolean;
   uploaderName?: string;
   onOpenLogin: () => void;
+  onOpenTextEditor?: (tab?: SiteTextEditorTab) => void;
   onNavigate: (tab: NavTabId) => void;
   onUpdateVisionMission: (vm: VisionMission) => Promise<void>;
   onUpdateChurchIdentity: (
@@ -66,22 +71,38 @@ interface OverviewSectionProps {
     caption: string;
     imageDataUrl: string;
   }) => Promise<void>;
+  onUpdateGalleryPhoto?: (
+    id: string,
+    payload: {
+      title: string;
+      category: GalleryCategory;
+      date: string;
+      caption: string;
+    }
+  ) => Promise<void>;
   onDeleteGalleryPhoto: (id: string) => Promise<void>;
 }
 
 export const OverviewSection: React.FC<OverviewSectionProps> = ({
   data,
+  siteContent,
   notifications,
   canEditAdmin,
   canUploadGallery,
   uploaderName,
   onOpenLogin,
+  onOpenTextEditor,
   onNavigate,
   onUpdateVisionMission,
   onUpdateChurchIdentity,
   onAddGalleryPhoto,
+  onUpdateGalleryPhoto,
   onDeleteGalleryPhoto,
 }) => {
+  const resolvedSiteContent = useMemo(
+    () => mergeSiteContent(siteContent ?? data.siteContent),
+    [siteContent, data.siteContent]
+  );
   const [editingVision, setEditingVision] = useState(false);
   const [vmForm, setVmForm] = useState({
     period: data.visionMission.period,
@@ -100,7 +121,7 @@ export const OverviewSection: React.FC<OverviewSectionProps> = ({
         raw?.description ||
         'Lambang resmi GKII Jemaat Sungai Barang yang memuat empat simbol pokok Injil Empat Berganda dan dapat diunduh untuk keperluan surat, warta cetak, maupun spanduk pelayanan.',
       churchName: raw?.churchName || 'Gereja Kemah Injil Indonesia',
-      subLabel: raw?.subLabel || 'Jemaat Sungai Barang · The Fourfold Gospel',
+      subLabel: raw?.subLabel || 'Jemaat Sungai Barang · Injil Empat Berganda',
       logoUrl: raw?.logoUrl || GKII_OFFICIAL_LOGO_URL,
       symbols:
         raw?.symbols && raw.symbols.length === 4 ? raw.symbols : FOURFOLD_GOSPEL_SYMBOLS,
@@ -271,12 +292,15 @@ export const OverviewSection: React.FC<OverviewSectionProps> = ({
   const latestGrowth = annualSeries[annualSeries.length - 1] || data.growthSeries[data.growthSeries.length - 1];
 
   const organOrder: { id: OrganPelayanan; subtitle: string }[] = [
-    { id: 'Perkaria', subtitle: 'Kaum Pria' },
-    { id: 'Perkawan', subtitle: 'Kaum Wanita' },
-    { id: 'Sekolah Minggu', subtitle: 'Anak (0–12)' },
-    { id: 'Remaja', subtitle: 'Remaja (13–17)' },
-    { id: 'Pemuda', subtitle: 'Pemuda (18–30)' },
-    { id: 'Lansia', subtitle: 'Usia 60+' },
+    { id: 'Perkaria', subtitle: resolvedSiteContent.organSubtitles.Perkaria },
+    { id: 'Perkawan', subtitle: resolvedSiteContent.organSubtitles.Perkawan },
+    {
+      id: 'Sekolah Minggu',
+      subtitle: resolvedSiteContent.organSubtitles['Sekolah Minggu'],
+    },
+    { id: 'Remaja', subtitle: resolvedSiteContent.organSubtitles.Remaja },
+    { id: 'Pemuda', subtitle: resolvedSiteContent.organSubtitles.Pemuda },
+    { id: 'Lansia', subtitle: resolvedSiteContent.organSubtitles.Lansia },
   ];
 
   const liveOrganMap: Record<OrganPelayanan, number> = {
@@ -310,16 +334,26 @@ export const OverviewSection: React.FC<OverviewSectionProps> = ({
         <div className="grid grid-cols-1 lg:grid-cols-12 items-stretch">
           <div className="lg:col-span-7 p-6 sm:p-8 lg:p-10 flex flex-col justify-between space-y-6">
             <div className="space-y-3">
-              <p className="text-xs font-medium text-[#146C43]">
-                Gereja Kemah Injil Indonesia · Jemaat Sungai Barang
-              </p>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-xs font-medium text-[#146C43]">
+                  {resolvedSiteContent.heroEyebrow}
+                </p>
+                {canEditAdmin && onOpenTextEditor && (
+                  <button
+                    type="button"
+                    onClick={() => onOpenTextEditor('beranda')}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#D4E4D8] bg-[#F5F9F6] hover:bg-[#EAF3EC] text-xs font-semibold text-[#0F2419] whitespace-nowrap cursor-pointer"
+                  >
+                    <Pencil className="w-3.5 h-3.5 text-[#146C43]" />
+                    <span>Ubah Teks Beranda</span>
+                  </button>
+                )}
+              </div>
               <h1 className="text-2xl sm:text-3xl lg:text-[2.25rem] font-bold tracking-tight text-[#0F2419] leading-tight [text-wrap:balance]">
-                Portal Pelayanan, Persekutuan, dan Administrasi Jemaat
+                {resolvedSiteContent.heroTitle}
               </h1>
               <p className="text-[15px] sm:text-base text-[#456051] leading-relaxed max-w-2xl">
-                Akses terpadu untuk jadwal ibadah, warta gereja, panduan doa harian, pembukuan kas
-                jemaat secara transparan, serta pengingat ulang tahun dan rapat kepanitiaan secara
-                real-time.
+                {resolvedSiteContent.heroSubtitle}
               </p>
             </div>
 
@@ -424,9 +458,11 @@ export const OverviewSection: React.FC<OverviewSectionProps> = ({
             <div className="pt-4 flex items-center justify-between text-xs text-[#2D4D3B] border-t border-[#C8DEC0]">
               <div className="flex items-center gap-2">
                 <GkiiLogo variant="mark" src={churchIdentity.logoUrl} className="w-6 h-6 shrink-0" />
-                <span>Desa Sungai Barang · Kalimantan</span>
+                <span>{resolvedSiteContent.heroLocationLabel}</span>
               </div>
-              <span className="font-mono tabular-nums font-semibold">GKII</span>
+              <span className="font-mono tabular-nums font-semibold">
+                {resolvedSiteContent.heroBadgeCode}
+              </span>
             </div>
           </div>
         </div>
@@ -887,10 +923,10 @@ export const OverviewSection: React.FC<OverviewSectionProps> = ({
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div>
               <h2 className="text-lg font-bold text-[#0F2419]">
-                Notifikasi Otomatis Hari Ini
+                {resolvedSiteContent.notifTitle}
               </h2>
               <p className="text-sm text-[#456051]">
-                Pembaruan real-time ulang tahun jemaat, pernikahan, dan pengingat rapat panitia.
+                {resolvedSiteContent.notifSubtitle}
               </p>
             </div>
             <button
@@ -1035,10 +1071,10 @@ export const OverviewSection: React.FC<OverviewSectionProps> = ({
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div>
             <h2 className="text-lg font-bold text-[#0F2419]">
-              Jumlah Jemaat per Organ Pelayanan
+              {resolvedSiteContent.organHeading}
             </h2>
             <p className="text-xs text-[#456051]">
-              Rekapitulasi jumlah Perkaria, Perkawan, Sekolah Minggu, Remaja, Pemuda, dan Lansia ({latestGrowth?.period || 'Terkini'}).
+              {resolvedSiteContent.organSubtitle} ({latestGrowth?.period || 'Terkini'}).
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -1206,10 +1242,13 @@ export const OverviewSection: React.FC<OverviewSectionProps> = ({
       {/* Galeri Kegiatan Gereja */}
       <ChurchGalleryModule
         gallery={data.gallery || []}
+        siteContent={resolvedSiteContent}
+        canEditAdmin={canEditAdmin}
         canUploadGallery={canUploadGallery}
         uploaderName={uploaderName}
         onOpenLogin={onOpenLogin}
         onAddPhoto={onAddGalleryPhoto}
+        onUpdatePhoto={onUpdateGalleryPhoto}
         onDeletePhoto={onDeleteGalleryPhoto}
       />
     </div>

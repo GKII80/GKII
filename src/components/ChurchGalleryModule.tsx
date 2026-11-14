@@ -5,13 +5,15 @@ import {
   ChevronRight,
   ImagePlus,
   Lock,
+  Pencil,
   RefreshCw,
   Trash2,
   Upload,
   X,
 } from 'lucide-react';
-import { GalleryCategory, GalleryPhoto } from '../types';
+import { GalleryCategory, GalleryPhoto, SiteTextContent } from '../types';
 import { formatIndonesianDate } from '../lib/dateAndFormat';
+import { DEFAULT_SITE_CONTENT } from '../lib/siteContentDefaults';
 
 const GALLERY_CATEGORIES: GalleryCategory[] = [
   'Ibadah Raya',
@@ -24,6 +26,8 @@ const GALLERY_CATEGORIES: GalleryCategory[] = [
 
 interface ChurchGalleryModuleProps {
   gallery: GalleryPhoto[];
+  siteContent?: SiteTextContent;
+  canEditAdmin?: boolean;
   canUploadGallery: boolean;
   uploaderName?: string;
   onOpenLogin: () => void;
@@ -34,6 +38,15 @@ interface ChurchGalleryModuleProps {
     caption: string;
     imageDataUrl: string;
   }) => Promise<void>;
+  onUpdatePhoto?: (
+    id: string,
+    payload: {
+      title: string;
+      category: GalleryCategory;
+      date: string;
+      caption: string;
+    }
+  ) => Promise<void>;
   onDeletePhoto: (id: string) => Promise<void>;
 }
 
@@ -69,16 +82,28 @@ function compressImageToJpegDataUrl(
 
 export const ChurchGalleryModule: React.FC<ChurchGalleryModuleProps> = ({
   gallery,
+  siteContent,
+  canEditAdmin,
   canUploadGallery,
   uploaderName,
   onOpenLogin,
   onAddPhoto,
+  onUpdatePhoto,
   onDeletePhoto,
 }) => {
   const [selectedCategory, setSelectedCategory] = useState<'Semua' | GalleryCategory>('Semua');
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  // Edit photo modal states
+  const [editingPhoto, setEditingPhoto] = useState<GalleryPhoto | null>(null);
+  const [editTitle, setEditTitle] = useState('');
+  const [editCategory, setEditCategory] = useState<GalleryCategory>('Ibadah Raya');
+  const [editDate, setEditDate] = useState(todayYMD);
+  const [editCaption, setEditCaption] = useState('');
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
 
   // Camera & Upload modal states
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
@@ -320,17 +345,17 @@ export const ChurchGalleryModule: React.FC<ChurchGalleryModuleProps> = ({
         <div className="space-y-1">
           <div className="flex items-center gap-2 text-xs font-semibold text-[#146C43]">
             <Camera className="w-4 h-4" />
-            <span>Dokumentasi Visual Pelayanan</span>
+            <span>{siteContent?.galleryKicker || DEFAULT_SITE_CONTENT.galleryKicker}</span>
             <span aria-hidden="true">·</span>
             <span className="font-mono tabular-nums text-[#0F5132]">
               {gallery.length} Foto Kegiatan
             </span>
           </div>
           <h2 className="text-xl sm:text-2xl font-bold text-[#0F2419]">
-            Galeri Kegiatan Gereja
+            {siteContent?.galleryTitle || DEFAULT_SITE_CONTENT.galleryTitle}
           </h2>
           <p className="text-sm text-[#456051]">
-            Dokumentasi ibadah raya, pembinaan organ pelayanan, diakonia, dan kebersamaan Jemaat Sungai Barang.
+            {siteContent?.gallerySubtitle || DEFAULT_SITE_CONTENT.gallerySubtitle}
           </p>
         </div>
 
@@ -446,36 +471,57 @@ export const ChurchGalleryModule: React.FC<ChurchGalleryModuleProps> = ({
               <div className="px-4 py-3 border-t border-[#E6EFE8] bg-white flex items-center justify-between gap-2 text-xs">
                 <span className="text-[#456051] truncate">Oleh {photo.capturedBy}</span>
 
-                {canUploadGallery && (
-                  <div className="shrink-0">
-                    {confirmDeleteId === photo.id ? (
-                      <div className="inline-flex items-center gap-1.5">
-                        <button
-                          type="button"
-                          disabled={deletingId === photo.id}
-                          onClick={() => void handleConfirmDelete(photo.id)}
-                          className="px-2 py-1 rounded bg-[#B91C1C] text-white font-semibold hover:bg-red-800 whitespace-nowrap cursor-pointer disabled:opacity-60"
-                        >
-                          {deletingId === photo.id ? 'Menghapus...' : 'Ya, Hapus'}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setConfirmDeleteId(null)}
-                          className="px-2 py-1 rounded border border-[#D4E4D8] text-[#456051] hover:text-[#0F2419] whitespace-nowrap cursor-pointer"
-                        >
-                          Batal
-                        </button>
-                      </div>
-                    ) : (
+                {(canUploadGallery || (canEditAdmin && onUpdatePhoto)) && (
+                  <div className="shrink-0 flex items-center gap-2">
+                    {canEditAdmin && onUpdatePhoto && confirmDeleteId !== photo.id && (
                       <button
                         type="button"
-                        onClick={() => setConfirmDeleteId(photo.id)}
-                        className="inline-flex items-center gap-1 text-[#456051] hover:text-[#B91C1C] font-medium whitespace-nowrap cursor-pointer"
-                        aria-label={`Hapus foto ${photo.title}`}
+                        onClick={() => {
+                          setEditingPhoto(photo);
+                          setEditTitle(photo.title);
+                          setEditCategory(photo.category);
+                          setEditDate(photo.date);
+                          setEditCaption(photo.caption);
+                          setEditError(null);
+                        }}
+                        className="inline-flex items-center gap-1 text-[#456051] hover:text-[#146C43] font-medium whitespace-nowrap cursor-pointer"
+                        aria-label={`Ubah keterangan foto ${photo.title}`}
                       >
-                        <Trash2 className="w-3.5 h-3.5" />
-                        <span>Hapus</span>
+                        <Pencil className="w-3.5 h-3.5" />
+                        <span>Ubah</span>
                       </button>
+                    )}
+
+                    {canUploadGallery && (
+                      confirmDeleteId === photo.id ? (
+                        <div className="inline-flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            disabled={deletingId === photo.id}
+                            onClick={() => void handleConfirmDelete(photo.id)}
+                            className="px-2 py-1 rounded bg-[#B91C1C] text-white font-semibold hover:bg-red-800 whitespace-nowrap cursor-pointer disabled:opacity-60"
+                          >
+                            {deletingId === photo.id ? 'Menghapus...' : 'Ya, Hapus'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setConfirmDeleteId(null)}
+                            className="px-2 py-1 rounded border border-[#D4E4D8] text-[#456051] hover:text-[#0F2419] whitespace-nowrap cursor-pointer"
+                          >
+                            Batal
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setConfirmDeleteId(photo.id)}
+                          className="inline-flex items-center gap-1 text-[#456051] hover:text-[#B91C1C] font-medium whitespace-nowrap cursor-pointer"
+                          aria-label={`Hapus foto ${photo.title}`}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>Hapus</span>
+                        </button>
+                      )
                     )}
                   </div>
                 )}
@@ -850,6 +896,136 @@ export const ChurchGalleryModule: React.FC<ChurchGalleryModuleProps> = ({
                 Didokumentasikan oleh: <span className="font-medium text-[#0F2419]">{activeLightboxPhoto.capturedBy}</span>
               </p>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Photo Details Modal (Admin) */}
+      {editingPhoto && onUpdatePhoto && (
+        <div
+          className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4 overflow-y-auto"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="gallery-edit-modal-title"
+        >
+          <div className="bg-white rounded-2xl border border-[#D4E4D8] w-full max-w-lg overflow-hidden shadow-xl my-auto">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-[#E6EFE8] bg-[#F5F9F6]">
+              <h3
+                id="gallery-edit-modal-title"
+                className="text-base font-bold text-[#0F2419]"
+              >
+                Ubah Keterangan Foto Kegiatan
+              </h3>
+              <button
+                type="button"
+                onClick={() => setEditingPhoto(null)}
+                className="p-1.5 rounded-lg text-[#456051] hover:bg-white cursor-pointer"
+                aria-label="Tutup editor foto"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                if (!editTitle.trim()) {
+                  setEditError('Judul kegiatan wajib diisi.');
+                  return;
+                }
+                setSavingEdit(true);
+                setEditError(null);
+                try {
+                  await onUpdatePhoto(editingPhoto.id, {
+                    title: editTitle.trim(),
+                    category: editCategory,
+                    date: editDate || todayYMD(),
+                    caption: editCaption.trim(),
+                  });
+                  setEditingPhoto(null);
+                } catch (err) {
+                  setEditError(
+                    err instanceof Error ? err.message : 'Gagal memperbarui keterangan foto.'
+                  );
+                } finally {
+                  setSavingEdit(false);
+                }
+              }}
+              className="p-6 space-y-4"
+            >
+              {editError && (
+                <div className="rounded-lg border border-red-200 bg-red-50 px-3.5 py-2 text-xs font-medium text-[#B91C1C]">
+                  {editError}
+                </div>
+              )}
+
+              <label className="block space-y-1.5 text-sm">
+                <span className="font-semibold text-[#0F2419]">Judul Kegiatan</span>
+                <input
+                  required
+                  type="text"
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg border border-[#D4E4D8] text-sm text-[#0F2419] focus:outline-none focus:border-[#146C43]"
+                />
+              </label>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <label className="block space-y-1.5 text-sm">
+                  <span className="font-semibold text-[#0F2419]">Kategori Pelayanan</span>
+                  <select
+                    value={editCategory}
+                    onChange={(e) => setEditCategory(e.target.value as GalleryCategory)}
+                    className="w-full px-3 py-2 rounded-lg border border-[#D4E4D8] bg-white text-sm text-[#0F2419] focus:outline-none focus:border-[#146C43]"
+                  >
+                    {GALLERY_CATEGORIES.map((cat) => (
+                      <option key={cat} value={cat}>
+                        {cat}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="block space-y-1.5 text-sm">
+                  <span className="font-semibold text-[#0F2419]">Tanggal Kegiatan</span>
+                  <input
+                    required
+                    type="date"
+                    value={editDate}
+                    onChange={(e) => setEditDate(e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg border border-[#D4E4D8] text-sm text-[#0F2419] focus:outline-none focus:border-[#146C43]"
+                  />
+                </label>
+              </div>
+
+              <label className="block space-y-1.5 text-sm">
+                <span className="font-semibold text-[#0F2419]">Keterangan Singkat</span>
+                <textarea
+                  rows={3}
+                  value={editCaption}
+                  onChange={(e) => setEditCaption(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg border border-[#D4E4D8] text-sm text-[#0F2419] focus:outline-none focus:border-[#146C43]"
+                />
+              </label>
+
+              <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-[#E6EFE8]">
+                <button
+                  type="button"
+                  disabled={savingEdit}
+                  onClick={() => setEditingPhoto(null)}
+                  className="px-4 py-2 rounded-lg border border-[#D4E4D8] text-xs font-semibold text-[#456051] cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingEdit}
+                  className="px-5 py-2 rounded-lg bg-[#146C43] hover:bg-[#0F5132] disabled:opacity-60 text-white text-xs font-semibold cursor-pointer"
+                >
+                  {savingEdit ? 'Menyimpan...' : 'Simpan Perubahan'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

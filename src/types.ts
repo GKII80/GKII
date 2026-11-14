@@ -264,9 +264,68 @@ export interface ChurchIdentity {
   updatedAt?: string;
 }
 
+export interface SiteTextContent {
+  appTitle: string;
+  appSubtitle: string;
+  footerOrg: string;
+  footerMotto: string;
+  kopAddressLine: string;
+  kopRegionLine: string;
+  navLabels: {
+    beranda: string;
+    ibadah: string;
+    renungan: string;
+    kas: string;
+    jemaat: string;
+    pertumbuhan: string;
+    pengurus: string;
+    kepanitiaan: string;
+    surat: string;
+  };
+  heroEyebrow: string;
+  heroTitle: string;
+  heroSubtitle: string;
+  heroLocationLabel: string;
+  heroBadgeCode: string;
+  organHeading: string;
+  organSubtitle: string;
+  organSubtitles: {
+    Perkaria: string;
+    Perkawan: string;
+    'Sekolah Minggu': string;
+    Remaja: string;
+    Pemuda: string;
+    Lansia: string;
+  };
+  notifTitle: string;
+  notifSubtitle: string;
+  galleryKicker: string;
+  galleryTitle: string;
+  gallerySubtitle: string;
+  sections: {
+    ibadahTitle: string;
+    ibadahSubtitle: string;
+    renunganTitle: string;
+    renunganSubtitle: string;
+    kasTitle: string;
+    kasSubtitle: string;
+    jemaatTitle: string;
+    jemaatSubtitle: string;
+    pertumbuhanTitle: string;
+    pertumbuhanSubtitle: string;
+    pengurusTitle: string;
+    pengurusSubtitle: string;
+    kepanitiaanTitle: string;
+    kepanitiaanSubtitle: string;
+    suratTitle: string;
+    suratSubtitle: string;
+  };
+}
+
 export interface ChurchDatabase {
   visionMission: VisionMission;
   churchIdentity?: ChurchIdentity;
+  siteContent?: SiteTextContent;
   schedules: WorshipSchedule[];
   announcements: ChurchAnnouncement[];
   prayers: DailyPrayer[];

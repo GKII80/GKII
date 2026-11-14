@@ -3,31 +3,42 @@ import {
   Check,
   Copy,
   Download,
+  Pencil,
   Plus,
   Send,
   Share2,
+  Trash2,
 } from 'lucide-react';
-import { Devotional } from '../types';
+import { Devotional, SiteTextContent } from '../types';
 import { formatIndonesianDate } from '../lib/dateAndFormat';
+import { DEFAULT_SITE_CONTENT } from '../lib/siteContentDefaults';
 
 interface DevotionalShareSectionProps {
   devotionals: Devotional[];
+  siteContent?: SiteTextContent;
   canEditAdmin: boolean;
   onAddDevotional: (item: Omit<Devotional, 'id'>) => Promise<void>;
+  onUpdateDevotional: (id: string, item: Omit<Devotional, 'id'>) => Promise<void>;
+  onDeleteDevotional: (id: string) => Promise<void>;
 }
 
 export const DevotionalShareSection: React.FC<DevotionalShareSectionProps> = ({
   devotionals,
+  siteContent,
   canEditAdmin,
   onAddDevotional,
+  onUpdateDevotional,
+  onDeleteDevotional,
 }) => {
   const [selectedId, setSelectedId] = useState<string>(devotionals[0]?.id || '');
   const [copied, setCopied] = useState(false);
   const [shareFeedback, setShareFeedback] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const [editingDevotionalId, setEditingDevotionalId] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
-  const [form, setForm] = useState<Omit<Devotional, 'id'>>({
+  const emptyDevotionalForm = (): Omit<Devotional, 'id'> => ({
     date: new Date().toISOString().slice(0, 10),
     title: '',
     verseRef: '',
@@ -37,6 +48,7 @@ export const DevotionalShareSection: React.FC<DevotionalShareSectionProps> = ({
     closingPrayer: '',
     author: 'Pdt. Lukas H. Bangun, M.Th.',
   });
+  const [form, setForm] = useState<Omit<Devotional, 'id'>>(emptyDevotionalForm);
 
   const active =
     devotionals.find((d) => d.id === selectedId) || devotionals[0];
@@ -144,15 +156,14 @@ export const DevotionalShareSection: React.FC<DevotionalShareSectionProps> = ({
     ctx.fillText(`Oleh ${active.author} · @gkiisungaibarang`, 110, h - 130);
   }, [active]);
 
-  if (!active) return null;
-
   const buildShareText = (d: Devotional) =>
     `*Renungan Harian GKII Jemaat Sungai Barang*\n${formatIndonesianDate(d.date)}\n\n*${d.title}*\n"${d.verseText}" (${d.verseRef})\n\n${d.content}\n\n*Aplikasi:* ${d.application}\n\n*Doa:* ${d.closingPrayer}\n— ${d.author}`;
 
-  const shareText = buildShareText(active);
   const currentUrl = typeof window !== 'undefined' ? window.location.href : 'https://gkiisungaibarang.or.id';
 
   const handleCopy = async () => {
+    if (!active) return;
+    const shareText = buildShareText(active);
     try {
       await navigator.clipboard.writeText(shareText);
       setCopied(true);
@@ -163,6 +174,8 @@ export const DevotionalShareSection: React.FC<DevotionalShareSectionProps> = ({
   };
 
   const handleNativeShare = async () => {
+    if (!active) return;
+    const shareText = buildShareText(active);
     if (navigator.share) {
       try {
         await navigator.share({
@@ -181,7 +194,7 @@ export const DevotionalShareSection: React.FC<DevotionalShareSectionProps> = ({
   };
 
   const handleDownloadCard = () => {
-    if (!canvasRef.current) return;
+    if (!canvasRef.current || !active) return;
     const link = document.createElement('a');
     link.download = `renungan-gkii-sungai-barang-${active.date}.png`;
     link.href = canvasRef.current.toDataURL('image/png');
@@ -192,35 +205,59 @@ export const DevotionalShareSection: React.FC<DevotionalShareSectionProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.title.trim() || !form.content.trim()) return;
-    await onAddDevotional(form);
-    setForm({
-      date: new Date().toISOString().slice(0, 10),
-      title: '',
-      verseRef: '',
-      verseText: '',
-      content: '',
-      application: '',
-      closingPrayer: '',
-      author: 'Pdt. Lukas H. Bangun, M.Th.',
-    });
+    if (editingDevotionalId) {
+      await onUpdateDevotional(editingDevotionalId, form);
+    } else {
+      await onAddDevotional(form);
+    }
+    setForm(emptyDevotionalForm());
+    setEditingDevotionalId(null);
     setShowForm(false);
   };
+
+  const handleStartEdit = (item: Devotional) => {
+    setEditingDevotionalId(item.id);
+    setForm({
+      date: item.date,
+      title: item.title,
+      verseRef: item.verseRef,
+      verseText: item.verseText,
+      content: item.content,
+      application: item.application,
+      closingPrayer: item.closingPrayer,
+      author: item.author,
+    });
+    setShowForm(true);
+  };
+
+  const shareText = active ? buildShareText(active) : '';
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-[#0F2419]">
-            Renungan Harian & Berbagi Media Sosial
+            {siteContent?.sections.renunganTitle ||
+              DEFAULT_SITE_CONTENT.sections.renunganTitle}
           </h1>
           <p className="text-sm text-[#456051] mt-1">
-            Baca firman Tuhan setiap hari dan bagikan langsung ke WhatsApp, Facebook, X, Telegram, atau kartu gambar.
+            {siteContent?.sections.renunganSubtitle ||
+              DEFAULT_SITE_CONTENT.sections.renunganSubtitle}
           </p>
         </div>
         {canEditAdmin && (
           <button
             type="button"
-            onClick={() => setShowForm((v) => !v)}
+            onClick={() => {
+              if (showForm && editingDevotionalId) {
+                setEditingDevotionalId(null);
+                setForm(emptyDevotionalForm());
+              } else {
+                setEditingDevotionalId(null);
+                setForm(emptyDevotionalForm());
+                setShowForm((v) => !v);
+              }
+            }}
             className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-[#146C43] hover:bg-[#0F5132] text-white text-sm font-semibold whitespace-nowrap shrink-0 cursor-pointer"
           >
             <Plus className="w-4 h-4" />
@@ -234,7 +271,9 @@ export const DevotionalShareSection: React.FC<DevotionalShareSectionProps> = ({
           onSubmit={handleSubmit}
           className="rounded-2xl border border-[#BFE0C9] bg-white p-6 space-y-4"
         >
-          <h2 className="text-lg font-bold text-[#0F2419]">Terbitkan Renungan Harian</h2>
+          <h2 className="text-lg font-bold text-[#0F2419]">
+            {editingDevotionalId ? 'Perbarui Renungan Harian' : 'Terbitkan Renungan Harian'}
+          </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <label className="space-y-1.5 text-sm">
               <span className="font-medium text-[#0F2419]">Judul Renungan</span>
@@ -323,11 +362,15 @@ export const DevotionalShareSection: React.FC<DevotionalShareSectionProps> = ({
               type="submit"
               className="px-5 py-2.5 rounded-lg bg-[#146C43] hover:bg-[#0F5132] text-white text-sm font-semibold cursor-pointer"
             >
-              Terbitkan Renungan
+              {editingDevotionalId ? 'Simpan Perubahan Renungan' : 'Terbitkan Renungan'}
             </button>
             <button
               type="button"
-              onClick={() => setShowForm(false)}
+              onClick={() => {
+                setEditingDevotionalId(null);
+                setForm(emptyDevotionalForm());
+                setShowForm(false);
+              }}
               className="px-5 py-2.5 rounded-lg border border-[#D4E4D8] text-[#456051] text-sm font-medium cursor-pointer"
             >
               Batal
@@ -336,39 +379,99 @@ export const DevotionalShareSection: React.FC<DevotionalShareSectionProps> = ({
         </form>
       )}
 
-      {/* Archive Selector */}
-      <div className="flex flex-wrap items-center gap-2">
-        {devotionals.map((d) => (
-          <button
-            key={d.id}
-            type="button"
-            onClick={() => setSelectedId(d.id)}
-            className={`px-4 py-2 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap cursor-pointer ${
-              active.id === d.id
-                ? 'bg-[#146C43] text-white'
-                : 'bg-white border border-[#D4E4D8] text-[#456051] hover:text-[#0F2419]'
-            }`}
-          >
-            {formatIndonesianDate(d.date)} · {d.title}
-          </button>
-        ))}
-      </div>
-
-      {/* Main Reader + Social Share Card Preview */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        <article className="lg:col-span-7 rounded-2xl border border-[#D4E4D8] bg-white p-6 sm:p-8 space-y-6">
-          <div className="space-y-2">
-            <div className="flex flex-wrap items-center gap-2 text-xs text-[#456051]">
-              <span className="font-semibold text-[#146C43]">Renungan Harian</span>
-              <span aria-hidden="true">·</span>
-              <span>{formatIndonesianDate(active.date)}</span>
-              <span aria-hidden="true">·</span>
-              <span>{active.author}</span>
-            </div>
-            <h2 className="text-2xl sm:text-3xl font-bold text-[#0F2419] leading-snug">
-              {active.title}
-            </h2>
+      {!active ? (
+        <div className="rounded-2xl border border-[#D4E4D8] bg-white p-10 text-center space-y-2">
+          <p className="text-base font-semibold text-[#0F2419]">
+            Belum ada renungan harian yang diterbitkan
+          </p>
+          <p className="text-sm text-[#456051]">
+            Silakan tambahkan renungan harian baru melalui tombol di atas.
+          </p>
+        </div>
+      ) : (
+        <>
+          {/* Archive Selector */}
+          <div className="flex flex-wrap items-center gap-2">
+            {devotionals.map((d) => (
+              <button
+                key={d.id}
+                type="button"
+                onClick={() => {
+                  setSelectedId(d.id);
+                  setConfirmDeleteId(null);
+                }}
+                className={`px-4 py-2 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap cursor-pointer ${
+                  active.id === d.id
+                    ? 'bg-[#146C43] text-white'
+                    : 'bg-white border border-[#D4E4D8] text-[#456051] hover:text-[#0F2419]'
+                }`}
+              >
+                {formatIndonesianDate(d.date)} · {d.title}
+              </button>
+            ))}
           </div>
+
+          {/* Main Reader + Social Share Card Preview */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            <article className="lg:col-span-7 rounded-2xl border border-[#D4E4D8] bg-white p-6 sm:p-8 space-y-6">
+              <div className="flex items-start justify-between gap-4">
+                <div className="space-y-2">
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-[#456051]">
+                    <span className="font-semibold text-[#146C43]">Renungan Harian</span>
+                    <span aria-hidden="true">·</span>
+                    <span>{formatIndonesianDate(active.date)}</span>
+                    <span aria-hidden="true">·</span>
+                    <span>{active.author}</span>
+                  </div>
+                  <h2 className="text-2xl sm:text-3xl font-bold text-[#0F2419] leading-snug">
+                    {active.title}
+                  </h2>
+                </div>
+
+                {canEditAdmin && (
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => handleStartEdit(active)}
+                      title="Ubah renungan ini"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#D4E4D8] bg-[#F5F9F6] hover:bg-[#EAF3EC] text-xs font-semibold text-[#0F2419] cursor-pointer"
+                    >
+                      <Pencil className="w-3.5 h-3.5 text-[#146C43]" />
+                      <span>Ubah</span>
+                    </button>
+                    {confirmDeleteId === active.id ? (
+                      <div className="inline-flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            await onDeleteDevotional(active.id);
+                            setConfirmDeleteId(null);
+                          }}
+                          className="px-2.5 py-1.5 rounded-lg bg-[#B91C1C] text-white text-xs font-semibold cursor-pointer"
+                        >
+                          Ya, Hapus
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setConfirmDeleteId(null)}
+                          className="px-2.5 py-1.5 rounded-lg border border-[#D4E4D8] text-xs font-medium text-[#456051] cursor-pointer"
+                        >
+                          Batal
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setConfirmDeleteId(active.id)}
+                        title="Hapus renungan ini"
+                        className="p-2 rounded-lg text-[#6B8576] hover:text-[#B91C1C] hover:bg-red-50 transition-colors cursor-pointer"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
 
           <div className="rounded-xl bg-[#F5F9F6] border border-[#D4E4D8] p-5 space-y-2">
             <p className="text-xs font-bold text-[#146C43]">{active.verseRef}</p>
@@ -493,6 +596,8 @@ export const DevotionalShareSection: React.FC<DevotionalShareSectionProps> = ({
           </button>
         </aside>
       </div>
+        </>
+      )}
     </div>
   );
 };

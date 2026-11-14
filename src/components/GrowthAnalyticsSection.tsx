@@ -5,11 +5,14 @@ import {
   GrowthSnapshot,
   Member,
   OrganPelayanan,
+  SiteTextContent,
 } from '../types';
+import { DEFAULT_SITE_CONTENT } from '../lib/siteContentDefaults';
 
 interface GrowthAnalyticsSectionProps {
   growthSeries: GrowthSnapshot[];
   members: Member[];
+  siteContent?: SiteTextContent;
 }
 
 const ORGANS: OrganPelayanan[] = [
@@ -49,6 +52,7 @@ const AGE_COLORS: Record<AgeCategory, string> = {
 export const GrowthAnalyticsSection: React.FC<GrowthAnalyticsSectionProps> = ({
   growthSeries,
   members,
+  siteContent,
 }) => {
   const [granularity, setGranularity] = useState<'tahunan' | 'triwulan'>('tahunan');
   const [hoveredPeriod, setHoveredPeriod] = useState<string | null>(null);
@@ -115,10 +119,12 @@ export const GrowthAnalyticsSection: React.FC<GrowthAnalyticsSectionProps> = ({
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-[#0F2419]">
-            Grafik Pertumbuhan Jemaat Berkala
+            {siteContent?.sections.pertumbuhanTitle ||
+              DEFAULT_SITE_CONTENT.sections.pertumbuhanTitle}
           </h1>
           <p className="text-sm text-[#456051] mt-1">
-            Statistik perkembangan jumlah jiwa berdasarkan Organ Pelayanan dan Kategori Usia di GKII Sungai Barang.
+            {siteContent?.sections.pertumbuhanSubtitle ||
+              DEFAULT_SITE_CONTENT.sections.pertumbuhanSubtitle}
           </p>
         </div>
 

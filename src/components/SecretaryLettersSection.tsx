@@ -16,9 +16,10 @@ import {
   Upload,
   X,
 } from 'lucide-react';
-import { ChurchLetter, LetterType } from '../types';
+import { ChurchLetter, LetterType, SiteTextContent } from '../types';
 import { formatIndonesianDate } from '../lib/dateAndFormat';
 import { generateChurchLetterPdf } from '../lib/letterDocumentPdf';
+import { DEFAULT_SITE_CONTENT } from '../lib/siteContentDefaults';
 
 const LETTER_TYPES: LetterType[] = [
   'Surat Masuk',
@@ -82,6 +83,7 @@ interface PendingPhotoDraft {
 
 interface SecretaryLettersSectionProps {
   letters: ChurchLetter[];
+  siteContent?: SiteTextContent;
   loadingLetters: boolean;
   canEditAdmin: boolean;
   secretaryName?: string;
@@ -170,6 +172,7 @@ function createEmptyForm(type: LetterType, existingCount: number): LetterFormSta
 
 export const SecretaryLettersSection: React.FC<SecretaryLettersSectionProps> = ({
   letters,
+  siteContent,
   loadingLetters,
   canEditAdmin,
   secretaryName,
@@ -540,7 +543,7 @@ export const SecretaryLettersSection: React.FC<SecretaryLettersSectionProps> = (
           </div>
           <div className="space-y-2">
             <p className="text-xs font-semibold text-[#146C43]">
-              Menu Administrasi Khusus Sekretaris
+              Akses Terbatas · Administrasi Jemaat
             </p>
             <h1 className="text-2xl font-bold text-[#0F2419]">
               Arsip Persuratan & Foto Fisik Surat
@@ -549,8 +552,8 @@ export const SecretaryLettersSection: React.FC<SecretaryLettersSectionProps> = (
               Pengelolaan <strong>Surat Masuk</strong>, <strong>Surat Keluar</strong>,{' '}
               <strong>Surat Keputusan</strong>, <strong>Surat Nikah</strong>,{' '}
               <strong>Surat Baptis</strong>, <strong>Surat Persembahan Anak</strong>, serta
-              pemotretan <strong>Foto Fisik Surat</strong> hanya dapat diakses oleh{' '}
-              <strong>Akun Sekretaris (Admin Penuh)</strong>.
+              pemotretan <strong>Foto Fisik Surat</strong> hanya dapat diakses setelah masuk
+              menggunakan akun berwenang.
             </p>
           </div>
           <button
@@ -559,7 +562,7 @@ export const SecretaryLettersSection: React.FC<SecretaryLettersSectionProps> = (
             className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-[#146C43] hover:bg-[#0F5132] text-white text-sm font-semibold transition-colors cursor-pointer"
           >
             <ShieldCheck className="w-4 h-4" />
-            <span>Masuk Akun Sekretaris (Admin)</span>
+            <span>Masuk Akun</span>
           </button>
         </div>
       </div>
@@ -572,13 +575,15 @@ export const SecretaryLettersSection: React.FC<SecretaryLettersSectionProps> = (
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <p className="text-xs font-semibold text-[#146C43]">
-            Sekretariat GKII Jemaat Sungai Barang · {secretaryName || 'Sekretaris Admin'}
+            Arsip Administrasi GKII Jemaat Sungai Barang
           </p>
           <h1 className="text-2xl sm:text-3xl font-bold text-[#0F2419] tracking-tight mt-0.5">
-            Arsip Surat, Sakramen & Foto Fisik Surat
+            {siteContent?.sections.suratTitle ||
+              DEFAULT_SITE_CONTENT.sections.suratTitle}
           </h1>
           <p className="text-sm text-[#456051] mt-1">
-            Kelola Surat Masuk, Surat Keluar, Surat Keputusan, Surat Nikah, Surat Baptis, Surat Persembahan Anak, dan arsip foto dokumen fisik.
+            {siteContent?.sections.suratSubtitle ||
+              DEFAULT_SITE_CONTENT.sections.suratSubtitle}
           </p>
         </div>
 
@@ -835,7 +840,12 @@ export const SecretaryLettersSection: React.FC<SecretaryLettersSectionProps> = (
                   </button>
                   <button
                     type="button"
-                    onClick={() => void generateChurchLetterPdf(letter, logoUrl)}
+                    onClick={() =>
+                      void generateChurchLetterPdf(letter, logoUrl, {
+                        kopAddressLine: siteContent?.kopAddressLine,
+                        kopRegionLine: siteContent?.kopRegionLine,
+                      })
+                    }
                     className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-[#D4E4D8] bg-[#F5F9F6] hover:bg-[#EAF3EC] text-xs font-semibold text-[#0F2419] whitespace-nowrap cursor-pointer"
                   >
                     <Download className="w-3.5 h-3.5 text-[#146C43]" />
@@ -847,7 +857,7 @@ export const SecretaryLettersSection: React.FC<SecretaryLettersSectionProps> = (
                     className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-[#D4E4D8] bg-white hover:bg-[#F5F9F6] text-xs font-semibold text-[#0F2419] whitespace-nowrap cursor-pointer"
                   >
                     <Pencil className="w-3.5 h-3.5 text-[#146C43]" />
-                    <span>Edit</span>
+                    <span>Ubah</span>
                   </button>
 
                   {confirmDeleteLetterId === letter.id ? (
@@ -938,7 +948,7 @@ export const SecretaryLettersSection: React.FC<SecretaryLettersSectionProps> = (
             <div className="px-6 py-4 border-b border-[#E6EFE8] bg-[#F5F9F6] flex items-center justify-between">
               <div>
                 <h2 className="text-lg font-bold text-[#0F2419]">
-                  {editingLetter ? 'Edit Arsip Surat' : 'Catat / Buat Surat Baru'}
+                  {editingLetter ? 'Ubah Arsip Surat' : 'Catat / Buat Surat Baru'}
                 </h2>
                 <p className="text-xs text-[#456051]">
                   Sekretariat GKII Jemaat Sungai Barang
@@ -1444,7 +1454,7 @@ export const SecretaryLettersSection: React.FC<SecretaryLettersSectionProps> = (
                       }`}
                     >
                       <Upload className="w-4 h-4" />
-                      <span>Kamera HP / Pilih File</span>
+                      <span>Kamera HP / Pilih Berkas</span>
                     </button>
                   </div>
 

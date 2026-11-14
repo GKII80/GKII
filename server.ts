@@ -22,9 +22,14 @@ import type {
   LetterType,
   Member,
   PhysicalLetterPhoto,
+  SiteTextContent,
   VisionMission,
   WorshipSchedule,
 } from './src/types.ts';
+import {
+  DEFAULT_SITE_CONTENT,
+  mergeSiteContent,
+} from './src/lib/siteContentDefaults.ts';
 
 const DEFAULT_CHURCH_IDENTITY: ChurchIdentity = {
   kicker: 'Identitas Resmi · Injil Empat Berganda',
@@ -32,7 +37,7 @@ const DEFAULT_CHURCH_IDENTITY: ChurchIdentity = {
   description:
     'Lambang resmi GKII Jemaat Sungai Barang yang memuat empat simbol pokok Injil Empat Berganda dan dapat diunduh untuk keperluan surat, warta cetak, maupun spanduk pelayanan.',
   churchName: 'Gereja Kemah Injil Indonesia',
-  subLabel: 'Jemaat Sungai Barang · The Fourfold Gospel',
+  subLabel: 'Jemaat Sungai Barang · Injil Empat Berganda',
   logoUrl: '/assets/aistudio/Logo_GKII_Warna_adc8a1a7.png',
   symbols: [
     {
@@ -128,6 +133,7 @@ function createInitialData(): ChurchDatabase {
   return {
     visionMission: DEFAULT_VISION_MISSION,
     churchIdentity: DEFAULT_CHURCH_IDENTITY,
+    siteContent: mergeSiteContent(),
     schedules: [
       {
         id: 'sch-1',
@@ -1320,16 +1326,28 @@ function loadDatabase(): ChurchDatabase {
   if (!parsed.churchIdentity) {
     parsed.churchIdentity = DEFAULT_CHURCH_IDENTITY;
     dirty = true;
-  } else if (
-    !Array.isArray(parsed.churchIdentity.symbols) ||
-    parsed.churchIdentity.symbols.length !== 4
-  ) {
-    parsed.churchIdentity = {
-      ...DEFAULT_CHURCH_IDENTITY,
-      ...parsed.churchIdentity,
-      symbols: DEFAULT_CHURCH_IDENTITY.symbols,
-    };
+  } else {
+    if (
+      !Array.isArray(parsed.churchIdentity.symbols) ||
+      parsed.churchIdentity.symbols.length !== 4
+    ) {
+      parsed.churchIdentity = {
+        ...DEFAULT_CHURCH_IDENTITY,
+        ...parsed.churchIdentity,
+        symbols: DEFAULT_CHURCH_IDENTITY.symbols,
+      };
+      dirty = true;
+    }
+    if (parsed.churchIdentity.subLabel === 'Jemaat Sungai Barang · The Fourfold Gospel') {
+      parsed.churchIdentity.subLabel = DEFAULT_CHURCH_IDENTITY.subLabel;
+      dirty = true;
+    }
+  }
+  if (!parsed.siteContent) {
+    parsed.siteContent = mergeSiteContent();
     dirty = true;
+  } else {
+    parsed.siteContent = mergeSiteContent(parsed.siteContent);
   }
   if (parsed.ledger.length <= 7 && !parsed.ledger.some((l) => l.id === 'led-h1')) {
     const seeded = initialData.ledger;
@@ -1728,7 +1746,7 @@ function requireFinanceAccess(
   if (!user) {
     res.status(401).json({
       error:
-        'Akses ditolak. Silakan masuk menggunakan Akun Bendahara atau Sekretaris Admin untuk mengelola data keuangan.',
+        'Akses ditolak. Silakan masuk menggunakan akun pengurus yang berwenang untuk mengelola data keuangan.',
     });
     return;
   }
@@ -1751,14 +1769,14 @@ function requireAdminAccess(
   if (!user) {
     res.status(401).json({
       error:
-        'Akses ditolak. Silakan masuk menggunakan Akun Sekretaris (Admin Penuh) untuk mengelola menu ini.',
+        'Akses ditolak. Silakan masuk menggunakan akun pengurus yang berwenang untuk mengelola menu ini.',
     });
     return;
   }
   if (user.roleType !== 'sekretaris_admin') {
     res.status(403).json({
       error:
-        'Izin terbatas. Menu administrasi ini hanya dapat diubah oleh Akun Sekretaris (Admin Penuh).',
+        'Izin terbatas. Menu administrasi ini hanya dapat diubah oleh akun pengurus yang berwenang.',
     });
     return;
   }
@@ -1813,14 +1831,14 @@ async function startServer() {
       (a) => a.username.toLowerCase() === idNorm || a.email.toLowerCase() === idNorm
     );
     if (!account || !password) {
-      res.status(401).json({ error: 'Username, email, atau kata sandi tidak sesuai.' });
+      res.status(401).json({ error: 'Nama pengguna, surel, atau kata sandi tidak sesuai.' });
       return;
     }
     const candidateHash = hashPassword(password, account.salt);
     const a = Buffer.from(candidateHash, 'hex');
     const b = Buffer.from(account.passwordHash, 'hex');
     if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
-      res.status(401).json({ error: 'Username, email, atau kata sandi tidak sesuai.' });
+      res.status(401).json({ error: 'Nama pengguna, surel, atau kata sandi tidak sesuai.' });
       return;
     }
     const user = toAuthUser(account);
@@ -1888,6 +1906,104 @@ async function startServer() {
     saveDatabase(db);
     broadcastUpdate('visionMission');
     res.json(db.visionMission);
+  });
+
+  app.put('/api/site-content', requireAdminAccess, (req, res) => {
+    const body = req.body as Partial<SiteTextContent> & { resetDefault?: boolean };
+    if (body.resetDefault) {
+      db.siteContent = mergeSiteContent();
+    } else {
+      const current = mergeSiteContent(db.siteContent);
+      db.siteContent = {
+        appTitle:
+          typeof body.appTitle === 'string' && body.appTitle.trim()
+            ? body.appTitle.trim()
+            : current.appTitle,
+        appSubtitle:
+          typeof body.appSubtitle === 'string' && body.appSubtitle.trim()
+            ? body.appSubtitle.trim()
+            : current.appSubtitle,
+        footerOrg:
+          typeof body.footerOrg === 'string' && body.footerOrg.trim()
+            ? body.footerOrg.trim()
+            : current.footerOrg,
+        footerMotto:
+          typeof body.footerMotto === 'string' && body.footerMotto.trim()
+            ? body.footerMotto.trim()
+            : current.footerMotto,
+        kopAddressLine:
+          typeof body.kopAddressLine === 'string' && body.kopAddressLine.trim()
+            ? body.kopAddressLine.trim()
+            : current.kopAddressLine,
+        kopRegionLine:
+          typeof body.kopRegionLine === 'string' && body.kopRegionLine.trim()
+            ? body.kopRegionLine.trim()
+            : current.kopRegionLine,
+        navLabels: {
+          ...current.navLabels,
+          ...(body.navLabels || {}),
+        },
+        heroEyebrow:
+          typeof body.heroEyebrow === 'string' && body.heroEyebrow.trim()
+            ? body.heroEyebrow.trim()
+            : current.heroEyebrow,
+        heroTitle:
+          typeof body.heroTitle === 'string' && body.heroTitle.trim()
+            ? body.heroTitle.trim()
+            : current.heroTitle,
+        heroSubtitle:
+          typeof body.heroSubtitle === 'string' && body.heroSubtitle.trim()
+            ? body.heroSubtitle.trim()
+            : current.heroSubtitle,
+        heroLocationLabel:
+          typeof body.heroLocationLabel === 'string' && body.heroLocationLabel.trim()
+            ? body.heroLocationLabel.trim()
+            : current.heroLocationLabel,
+        heroBadgeCode:
+          typeof body.heroBadgeCode === 'string' && body.heroBadgeCode.trim()
+            ? body.heroBadgeCode.trim()
+            : current.heroBadgeCode,
+        organHeading:
+          typeof body.organHeading === 'string' && body.organHeading.trim()
+            ? body.organHeading.trim()
+            : current.organHeading,
+        organSubtitle:
+          typeof body.organSubtitle === 'string' && body.organSubtitle.trim()
+            ? body.organSubtitle.trim()
+            : current.organSubtitle,
+        organSubtitles: {
+          ...current.organSubtitles,
+          ...(body.organSubtitles || {}),
+        },
+        notifTitle:
+          typeof body.notifTitle === 'string' && body.notifTitle.trim()
+            ? body.notifTitle.trim()
+            : current.notifTitle,
+        notifSubtitle:
+          typeof body.notifSubtitle === 'string' && body.notifSubtitle.trim()
+            ? body.notifSubtitle.trim()
+            : current.notifSubtitle,
+        galleryKicker:
+          typeof body.galleryKicker === 'string' && body.galleryKicker.trim()
+            ? body.galleryKicker.trim()
+            : current.galleryKicker,
+        galleryTitle:
+          typeof body.galleryTitle === 'string' && body.galleryTitle.trim()
+            ? body.galleryTitle.trim()
+            : current.galleryTitle,
+        gallerySubtitle:
+          typeof body.gallerySubtitle === 'string' && body.gallerySubtitle.trim()
+            ? body.gallerySubtitle.trim()
+            : current.gallerySubtitle,
+        sections: {
+          ...current.sections,
+          ...(body.sections || {}),
+        },
+      };
+    }
+    saveDatabase(db);
+    broadcastUpdate('siteContent');
+    res.json(db.siteContent || DEFAULT_SITE_CONTENT);
   });
 
   app.put('/api/church-identity', requireAdminAccess, (req, res) => {
@@ -2074,6 +2190,22 @@ async function startServer() {
     res.status(201).json(item);
   });
 
+  app.put('/api/announcements/:id', requireAdminAccess, (req, res) => {
+    const idx = db.announcements.findIndex((a) => a.id === req.params.id);
+    if (idx === -1) {
+      res.status(404).json({ error: 'Warta gereja tidak ditemukan' });
+      return;
+    }
+    db.announcements[idx] = {
+      ...db.announcements[idx],
+      ...req.body,
+      id: db.announcements[idx].id,
+    };
+    saveDatabase(db);
+    broadcastUpdate('announcements');
+    res.json(db.announcements[idx]);
+  });
+
   app.delete('/api/announcements/:id', requireAdminAccess, (req, res) => {
     db.announcements = db.announcements.filter((a) => a.id !== req.params.id);
     saveDatabase(db);
@@ -2091,6 +2223,22 @@ async function startServer() {
     saveDatabase(db);
     broadcastUpdate('prayers');
     res.status(201).json(item);
+  });
+
+  app.put('/api/prayers/:id', requireAdminAccess, (req, res) => {
+    const idx = db.prayers.findIndex((p) => p.id === req.params.id);
+    if (idx === -1) {
+      res.status(404).json({ error: 'Pokok doa tidak ditemukan' });
+      return;
+    }
+    db.prayers[idx] = {
+      ...db.prayers[idx],
+      ...req.body,
+      id: db.prayers[idx].id,
+    };
+    saveDatabase(db);
+    broadcastUpdate('prayers');
+    res.json(db.prayers[idx]);
   });
 
   app.patch('/api/prayers/:id/pray', (req, res) => {
@@ -2263,6 +2411,22 @@ async function startServer() {
     res.status(201).json(item);
   });
 
+  app.put('/api/leadership/:id', requireAdminAccess, (req, res) => {
+    const idx = db.leadership.findIndex((l) => l.id === req.params.id);
+    if (idx === -1) {
+      res.status(404).json({ error: 'Data pengurus tidak ditemukan' });
+      return;
+    }
+    db.leadership[idx] = {
+      ...db.leadership[idx],
+      ...req.body,
+      id: db.leadership[idx].id,
+    };
+    saveDatabase(db);
+    broadcastUpdate('leadership');
+    res.json(db.leadership[idx]);
+  });
+
   app.delete('/api/leadership/:id', requireAdminAccess, (req, res) => {
     db.leadership = db.leadership.filter((l) => l.id !== req.params.id);
     saveDatabase(db);
@@ -2281,6 +2445,24 @@ async function startServer() {
     saveDatabase(db);
     broadcastUpdate('committees');
     res.status(201).json(item);
+  });
+
+  app.put('/api/committees/:id', requireAdminAccess, (req, res) => {
+    const idx = db.committees.findIndex((c) => c.id === req.params.id);
+    if (idx === -1) {
+      res.status(404).json({ error: 'Data kepanitiaan tidak ditemukan' });
+      return;
+    }
+    db.committees[idx] = {
+      ...db.committees[idx],
+      name: String(req.body.name ?? db.committees[idx].name).trim(),
+      eventDate: String(req.body.eventDate ?? db.committees[idx].eventDate).trim(),
+      description: String(req.body.description ?? db.committees[idx].description).trim(),
+      chairperson: String(req.body.chairperson ?? db.committees[idx].chairperson).trim(),
+    };
+    saveDatabase(db);
+    broadcastUpdate('committees');
+    res.json(db.committees[idx]);
   });
 
   app.post('/api/committees/:id/meetings', requireAdminAccess, (req, res) => {
@@ -2367,6 +2549,29 @@ async function startServer() {
     res.status(201).json(item);
   });
 
+  app.put('/api/devotionals/:id', requireAdminAccess, (req, res) => {
+    const idx = db.devotionals.findIndex((d) => d.id === req.params.id);
+    if (idx === -1) {
+      res.status(404).json({ error: 'Renungan tidak ditemukan' });
+      return;
+    }
+    db.devotionals[idx] = {
+      ...db.devotionals[idx],
+      ...req.body,
+      id: db.devotionals[idx].id,
+    };
+    saveDatabase(db);
+    broadcastUpdate('devotionals');
+    res.json(db.devotionals[idx]);
+  });
+
+  app.delete('/api/devotionals/:id', requireAdminAccess, (req, res) => {
+    db.devotionals = db.devotionals.filter((d) => d.id !== req.params.id);
+    saveDatabase(db);
+    broadcastUpdate('devotionals');
+    res.json({ ok: true });
+  });
+
   app.post('/api/gallery', requireAuth, (req, res) => {
     const authUser = (req as AuthenticatedRequest).authUser!;
     const body = req.body as {
@@ -2432,6 +2637,25 @@ async function startServer() {
     saveDatabase(db);
     broadcastUpdate('gallery');
     res.status(201).json(item);
+  });
+
+  app.put('/api/gallery/:id', requireAdminAccess, (req, res) => {
+    const idx = db.gallery.findIndex((g) => g.id === req.params.id);
+    if (idx === -1) {
+      res.status(404).json({ error: 'Foto kegiatan tidak ditemukan.' });
+      return;
+    }
+    const body = req.body as Partial<GalleryPhoto>;
+    db.gallery[idx] = {
+      ...db.gallery[idx],
+      title: String(body.title ?? db.gallery[idx].title).trim() || db.gallery[idx].title,
+      category: (body.category ?? db.gallery[idx].category) as GalleryCategory,
+      date: String(body.date ?? db.gallery[idx].date).trim() || db.gallery[idx].date,
+      caption: String(body.caption ?? db.gallery[idx].caption).trim(),
+    };
+    saveDatabase(db);
+    broadcastUpdate('gallery');
+    res.json(db.gallery[idx]);
   });
 
   app.delete('/api/gallery/:id', requireAuth, (req, res) => {
@@ -2703,9 +2927,57 @@ async function startServer() {
 
   const isProd = process.env.NODE_ENV === 'production';
   if (!isProd) {
+    // Serve a clean no-WebSocket @vite/client module because HMR is disabled in AI Studio preview
+    app.get('/@vite/client', (_req, res) => {
+      res.type('application/javascript').send(`
+const sheetsMap = new Map();
+function updateStyle(id, content) {
+  let style = sheetsMap.get(id);
+  if (!style) {
+    style = document.createElement('style');
+    style.setAttribute('type', 'text/css');
+    style.setAttribute('data-vite-dev-id', id);
+    style.textContent = content;
+    document.head.appendChild(style);
+    sheetsMap.set(id, style);
+  } else if (style.textContent !== content) {
+    style.textContent = content;
+  }
+}
+function removeStyle(id) {
+  const style = sheetsMap.get(id);
+  if (style && style.parentNode) {
+    style.parentNode.removeChild(style);
+    sheetsMap.delete(id);
+  }
+}
+function createHotContext() {
+  return {
+    data: {},
+    accept() {},
+    dispose() {},
+    prune() {},
+    decline() {},
+    invalidate() {},
+    on() {},
+    off() {},
+    send() {},
+  };
+}
+function injectQuery(url, queryToInject) {
+  if (url[0] !== '.' && url[0] !== '/') return url;
+  const pathname = url.replace(/[?#].*$/, '');
+  const { search, hash } = new URL(url, 'http://vite.dev');
+  return \`\${pathname}?\${queryToInject}\${search ? '&' + search.slice(1) : ''}\${hash || ''}\`;
+}
+class ErrorOverlay {}
+export { ErrorOverlay, createHotContext, injectQuery, removeStyle, updateStyle };
+`);
+    });
+
     const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: { middlewareMode: true, hmr: false, ws: false },
       appType: 'spa',
     });
     app.use(vite.middlewares);

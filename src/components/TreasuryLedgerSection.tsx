@@ -19,16 +19,18 @@ import {
   Wallet,
   X,
 } from 'lucide-react';
-import { AuthUser, LedgerCategory, LedgerEntry } from '../types';
+import { AuthUser, LedgerCategory, LedgerEntry, SiteTextContent } from '../types';
 import { formatIndonesianDate, formatRupiah, formatShortDate } from '../lib/dateAndFormat';
 import {
   generateFinancialReportPdf,
   ReportPrintScope,
 } from '../lib/financialReportPdf';
+import { DEFAULT_SITE_CONTENT } from '../lib/siteContentDefaults';
 import { GkiiLogo } from './GkiiLogo';
 
 interface TreasuryLedgerSectionProps {
   ledger: LedgerEntry[];
+  siteContent?: SiteTextContent;
   authUser: AuthUser | null;
   canEditFinance: boolean;
   logoUrl?: string;
@@ -85,6 +87,7 @@ const MONTH_SHORT_ID = [
 
 export const TreasuryLedgerSection: React.FC<TreasuryLedgerSectionProps> = ({
   ledger,
+  siteContent,
   authUser,
   canEditFinance,
   logoUrl,
@@ -560,10 +563,11 @@ export const TreasuryLedgerSection: React.FC<TreasuryLedgerSectionProps> = ({
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-[#0F2419]">
-            Laporan Kas & Pembukuan Jemaat
+            {siteContent?.sections.kasTitle || DEFAULT_SITE_CONTENT.sections.kasTitle}
           </h1>
           <p className="text-sm text-[#456051] mt-1">
-            Buku Kas Umum, Laporan Kas & Pengeluaran Per Bulan, serta Rekapan Tahunan GKII Jemaat Sungai Barang.
+            {siteContent?.sections.kasSubtitle ||
+              DEFAULT_SITE_CONTENT.sections.kasSubtitle}
           </p>
         </div>
 
@@ -604,13 +608,13 @@ export const TreasuryLedgerSection: React.FC<TreasuryLedgerSectionProps> = ({
           <div>
             <p className="text-sm font-bold text-[#0F2419]">
               {canEditFinance && authUser
-                ? `${authUser.roleType === 'sekretaris_admin' ? 'Sekretaris Admin Aktif' : 'Akun Bendahara Aktif'}: ${authUser.name} (${authUser.role})`
-                : 'Mode Baca Jemaat — Edit Data Keuangan Khusus Akun Bendahara atau Sekretaris Admin'}
+                ? `Mode Pengelola Keuangan Aktif · ${authUser.name}`
+                : 'Mode Baca Jemaat — Pengelolaan Data Keuangan Khusus Pengurus'}
             </p>
             <p className="text-xs text-[#456051] mt-0.5">
               {canEditFinance
-                ? 'Anda memiliki izin untuk mencatat transaksi baru, mengedit, dan menghapus data pembukuan.'
-                : 'Seluruh jemaat dapat melihat laporan kas secara transparan. Masuk dengan akun Bendahara atau Sekretaris Admin untuk mengubah data.'}
+                ? 'Anda memiliki izin untuk mencatat transaksi baru, mengubah, dan menghapus data pembukuan.'
+                : 'Seluruh jemaat dapat melihat laporan kas secara transparan.'}
             </p>
           </div>
         </div>
@@ -642,7 +646,7 @@ export const TreasuryLedgerSection: React.FC<TreasuryLedgerSectionProps> = ({
               className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[#146C43] hover:bg-[#0F5132] text-white text-xs font-semibold whitespace-nowrap cursor-pointer"
             >
               <KeyRound className="w-3.5 h-3.5" />
-              <span>Masuk Pengurus / Bendahara</span>
+              <span>Masuk Pengurus</span>
             </button>
           )}
         </div>
@@ -712,12 +716,12 @@ export const TreasuryLedgerSection: React.FC<TreasuryLedgerSectionProps> = ({
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-bold text-[#0F2419]">
               {editingId
-                ? 'Edit Catatan Transaksi Pembukuan'
+                ? 'Ubah Catatan Transaksi Pembukuan'
                 : 'Catat Transaksi Pembukuan Baru'}
             </h2>
             {editingId && (
               <span className="text-xs font-mono text-[#146C43] font-semibold">
-                Mode Edit · {form.voucherNo}
+                Mode Ubah · {form.voucherNo}
               </span>
             )}
           </div>
@@ -1419,7 +1423,7 @@ export const TreasuryLedgerSection: React.FC<TreasuryLedgerSectionProps> = ({
               {filteredRows.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="py-10 text-center text-[#456051]">
-                    Tidak ada catatan pembukuan yang sesuai dengan filter.
+                    Tidak ada catatan pembukuan yang sesuai dengan penyaringan.
                   </td>
                 </tr>
               ) : (
@@ -1457,11 +1461,11 @@ export const TreasuryLedgerSection: React.FC<TreasuryLedgerSectionProps> = ({
                           <button
                             type="button"
                             onClick={() => startEdit(row)}
-                            title="Edit transaksi"
+                            title="Ubah transaksi"
                             className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-[#146C43] hover:bg-[#EAF3EC] transition-colors cursor-pointer"
                           >
                             <Pencil className="w-3.5 h-3.5" />
-                            <span>Edit</span>
+                            <span>Ubah</span>
                           </button>
                           <button
                             type="button"
@@ -1503,7 +1507,7 @@ export const TreasuryLedgerSection: React.FC<TreasuryLedgerSectionProps> = ({
                   Pratinjau Cetak & Unduh PDF Laporan Kas
                 </h2>
                 <p className="text-xs text-[#456051] mt-0.5">
-                  Atur cakupan laporan, penandatangan resmi ({authUser ? authUser.role : 'Bendahara / Sekretaris'}), lalu unduh PDF atau cetak langsung.
+                  Atur cakupan laporan dan penandatangan resmi, lalu unduh PDF atau cetak langsung.
                 </p>
               </div>
               <button

@@ -107,7 +107,7 @@ export function exportMembersToExcel(members: Member[], filterLabel = 'Semua'): 
   const titleRows: (string | number)[][] = [
     ['GEREJA KEMAH INJIL INDONESIA (GKII) — JEMAAT SUNGAI BARANG'],
     ['DATA BUKU INDUK ANGGOTA JEMAAT'],
-    [`Filter: ${filterLabel} | Total Data: ${members.length} Jiwa | Diekspor: ${formatIndonesianDate(dateStamp)}`],
+    [`Penyaringan: ${filterLabel} | Total Data: ${members.length} Jiwa | Diekspor: ${formatIndonesianDate(dateStamp)}`],
     [],
     HEADERS,
     ...members.map((m, i) => memberToRow(m, i)),
@@ -186,7 +186,7 @@ export function exportMembersToExcel(members: Member[], filterLabel = 'Semua'): 
 
   const summaryRows: (string | number)[][] = [
     ['REKAPITULASI STATISTIK JEMAAT — GKII SUNGAI BARANG'],
-    [`Filter Ekspor: ${filterLabel} | Tanggal: ${formatIndonesianDate(dateStamp)}`],
+    [`Saringan Ekspor: ${filterLabel} | Tanggal: ${formatIndonesianDate(dateStamp)}`],
     [],
     ['Kategori', 'Jumlah (Jiwa)', 'Persentase'],
     ['Total Anggota Jemaat', total, '100%'],

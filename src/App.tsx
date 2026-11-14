@@ -15,6 +15,7 @@ import {
   KeyRound,
   Menu,
   MessageCircle,
+  Pencil,
   ShieldCheck,
   Users,
   Wallet,
@@ -34,6 +35,7 @@ import {
   LeadershipMember,
   LedgerEntry,
   Member,
+  SiteTextContent,
   VisionMission,
   WorshipSchedule,
 } from './types';
@@ -41,6 +43,7 @@ import {
   computeLiveNotifications,
   toWhatsAppUrl,
 } from './lib/dateAndFormat';
+import { mergeSiteContent } from './lib/siteContentDefaults';
 import { NavTabId, OverviewSection } from './components/OverviewSection';
 import { WorshipBulletinPrayerSection } from './components/WorshipBulletinPrayerSection';
 import { DevotionalShareSection } from './components/DevotionalShareSection';
@@ -51,21 +54,25 @@ import { GkiiLogo } from './components/GkiiLogo';
 import { LeadershipSection } from './components/LeadershipSection';
 import { CommitteeSection } from './components/CommitteeSection';
 import { SecretaryLettersSection } from './components/SecretaryLettersSection';
+import {
+  SiteTextEditorModal,
+  SiteTextEditorTab,
+} from './components/SiteTextEditorModal';
 
 const NAV_ITEMS: {
   id: NavTabId;
-  label: string;
+  defaultLabel: string;
   icon: React.ComponentType<{ className?: string }>;
 }[] = [
-  { id: 'beranda', label: 'Beranda', icon: Home },
-  { id: 'ibadah', label: 'Ibadah, Warta & Doa', icon: CalendarDays },
-  { id: 'renungan', label: 'Renungan Harian', icon: BookOpen },
-  { id: 'kas', label: 'Kas & Pembukuan', icon: Wallet },
-  { id: 'jemaat', label: 'Data Jemaat & HUT', icon: Users },
-  { id: 'pertumbuhan', label: 'Pertumbuhan Jemaat', icon: BarChart3 },
-  { id: 'pengurus', label: 'Badan Pengurus', icon: ShieldCheck },
-  { id: 'kepanitiaan', label: 'Kepanitiaan', icon: ClipboardList },
-  { id: 'surat', label: 'Arsip & Surat', icon: FileText },
+  { id: 'beranda', defaultLabel: 'Beranda', icon: Home },
+  { id: 'ibadah', defaultLabel: 'Ibadah, Warta & Doa', icon: CalendarDays },
+  { id: 'renungan', defaultLabel: 'Renungan Harian', icon: BookOpen },
+  { id: 'kas', defaultLabel: 'Kas & Pembukuan', icon: Wallet },
+  { id: 'jemaat', defaultLabel: 'Data Jemaat & HUT', icon: Users },
+  { id: 'pertumbuhan', defaultLabel: 'Pertumbuhan Jemaat', icon: BarChart3 },
+  { id: 'pengurus', defaultLabel: 'Badan Pengurus', icon: ShieldCheck },
+  { id: 'kepanitiaan', defaultLabel: 'Kepanitiaan', icon: ClipboardList },
+  { id: 'surat', defaultLabel: 'Arsip & Surat', icon: FileText },
 ];
 
 export default function App() {
@@ -88,7 +95,7 @@ export default function App() {
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
   const [loginModalOpen, setLoginModalOpen] = useState(false);
   const [changePwModalOpen, setChangePwModalOpen] = useState(false);
-  const [loginIdentifier, setLoginIdentifier] = useState('sekretaris');
+  const [loginIdentifier, setLoginIdentifier] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [authError, setAuthError] = useState<string | null>(null);
   const [pwForm, setPwForm] = useState({
@@ -102,6 +109,18 @@ export default function App() {
   const canEditFinance = isAdmin || authUser?.roleType === 'bendahara';
   const [letters, setLetters] = useState<ChurchLetter[]>([]);
   const [loadingLetters, setLoadingLetters] = useState(false);
+  const [textEditorOpen, setTextEditorOpen] = useState(false);
+  const [textEditorTab, setTextEditorTab] = useState<SiteTextEditorTab>('identitas');
+
+  const siteContent = useMemo(
+    () => mergeSiteContent(data?.siteContent),
+    [data?.siteContent]
+  );
+
+  const openTextEditor = (tab: SiteTextEditorTab = 'identitas') => {
+    setTextEditorTab(tab);
+    setTextEditorOpen(true);
+  };
 
   const fetchData = useCallback(async () => {
     try {
@@ -302,6 +321,10 @@ export default function App() {
   };
 
   // Handlers
+  const handleUpdateSiteContent = (
+    payload: Partial<SiteTextContent> & { resetDefault?: boolean }
+  ) => apiCall('/api/site-content', 'PUT', payload);
+
   const handleUpdateVisionMission = (vm: VisionMission) =>
     apiCall('/api/vision-mission', 'PUT', vm);
 
@@ -318,11 +341,17 @@ export default function App() {
 
   const handleAddAnnouncement = (item: Omit<ChurchAnnouncement, 'id'>) =>
     apiCall('/api/announcements', 'POST', item);
+  const handleUpdateAnnouncement = (id: string, item: Omit<ChurchAnnouncement, 'id'>) =>
+    apiCall(`/api/announcements/${id}`, 'PUT', item);
   const handleDeleteAnnouncement = (id: string) =>
     apiCall(`/api/announcements/${id}`, 'DELETE');
 
   const handleAddPrayer = (item: Omit<DailyPrayer, 'id' | 'prayedCount'>) =>
     apiCall('/api/prayers', 'POST', item);
+  const handleUpdatePrayer = (
+    id: string,
+    item: Omit<DailyPrayer, 'id' | 'prayedCount'>
+  ) => apiCall(`/api/prayers/${id}`, 'PUT', item);
   const handlePrayIncrement = (id: string) =>
     apiCall(`/api/prayers/${id}/pray`, 'PATCH');
   const handleDeletePrayer = (id: string) =>
@@ -330,6 +359,10 @@ export default function App() {
 
   const handleAddDevotional = (item: Omit<Devotional, 'id'>) =>
     apiCall('/api/devotionals', 'POST', item);
+  const handleUpdateDevotional = (id: string, item: Omit<Devotional, 'id'>) =>
+    apiCall(`/api/devotionals/${id}`, 'PUT', item);
+  const handleDeleteDevotional = (id: string) =>
+    apiCall(`/api/devotionals/${id}`, 'DELETE');
 
   const handleAddLedger = (entry: Omit<LedgerEntry, 'id'>) =>
     apiCall('/api/ledger', 'POST', entry);
@@ -347,6 +380,10 @@ export default function App() {
 
   const handleAddLeader = (leader: Omit<LeadershipMember, 'id' | 'order'>) =>
     apiCall('/api/leadership', 'POST', leader);
+  const handleUpdateLeader = (
+    id: string,
+    leader: Omit<LeadershipMember, 'id' | 'order'>
+  ) => apiCall(`/api/leadership/${id}`, 'PUT', leader);
   const handleDeleteLeader = (id: string) =>
     apiCall(`/api/leadership/${id}`, 'DELETE');
 
@@ -356,6 +393,15 @@ export default function App() {
     description: string;
     chairperson: string;
   }) => apiCall('/api/committees', 'POST', item);
+  const handleUpdateCommittee = (
+    id: string,
+    item: {
+      name: string;
+      eventDate: string;
+      description: string;
+      chairperson: string;
+    }
+  ) => apiCall(`/api/committees/${id}`, 'PUT', item);
 
   const handleAddMeeting = (
     committeeId: string,
@@ -396,6 +442,16 @@ export default function App() {
     imageDataUrl: string;
   }) => apiCall('/api/gallery', 'POST', payload);
 
+  const handleUpdateGalleryPhoto = (
+    id: string,
+    payload: {
+      title: string;
+      category: GalleryCategory;
+      date: string;
+      caption: string;
+    }
+  ) => apiCall(`/api/gallery/${id}`, 'PUT', payload);
+
   const handleDeleteGalleryPhoto = (id: string) =>
     apiCall(`/api/gallery/${id}`, 'DELETE');
 
@@ -419,8 +475,12 @@ export default function App() {
   const handleDeleteLetterPhoto = (letterId: string, photoId: string) =>
     apiCall(`/api/letters/${letterId}/photos/${photoId}`, 'DELETE');
 
-  const activeNavLabel =
-    NAV_ITEMS.find((item) => item.id === activeTab)?.label || 'Beranda';
+  const getNavLabel = (id: NavTabId) =>
+    siteContent.navLabels[id] ||
+    NAV_ITEMS.find((item) => item.id === id)?.defaultLabel ||
+    'Beranda';
+
+  const activeNavLabel = getNavLabel(activeTab);
 
   const selectTab = (tab: NavTabId) => {
     setActiveTab(tab);
@@ -445,10 +505,10 @@ export default function App() {
             />
             <div className="min-w-0">
               <span className="block text-base font-bold tracking-tight text-[#0F2419] truncate">
-                GKII Sungai Barang
+                {siteContent.appTitle}
               </span>
               <span className="block text-xs text-[#456051] mt-0.5 truncate">
-                Portal Jemaat & Pelayanan
+                {siteContent.appSubtitle}
               </span>
             </div>
           </button>
@@ -470,7 +530,7 @@ export default function App() {
                 }`}
               >
                 <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : 'text-[#146C43]'}`} />
-                <span className="truncate">{item.label}</span>
+                <span className="truncate">{getNavLabel(item.id)}</span>
               </button>
             );
           })}
@@ -478,15 +538,10 @@ export default function App() {
 
         <div className="px-5 py-4 border-t border-[#E6EFE8] text-xs text-[#456051] space-y-1">
           <p className="font-semibold text-[#0F2419]">Gereja Kemah Injil Indonesia</p>
-          <p>Jemaat Sungai Barang</p>
-          {authUser && (
-            <p className="text-[11px] font-semibold text-[#0F5132] pt-1">
-              {isAdmin ? 'Admin: Sekretaris (Akses Penuh)' : 'Akun: Bendahara Jemaat'}
-            </p>
-          )}
+          <p>{siteContent.appTitle}</p>
           {sseConnected && (
             <p className="text-[11px] text-[#146C43] font-medium pt-0.5">
-              Pembaruan real-time aktif
+              Pembaruan langsung aktif
             </p>
           )}
         </div>
@@ -507,7 +562,9 @@ export default function App() {
                   src={data?.churchIdentity?.logoUrl}
                   className="w-8 h-8 shrink-0"
                 />
-                <span className="text-base font-bold text-[#0F2419] truncate">GKII Sungai Barang</span>
+                <span className="text-base font-bold text-[#0F2419] truncate">
+                  {siteContent.appTitle}
+                </span>
               </div>
               <button
                 type="button"
@@ -534,7 +591,7 @@ export default function App() {
                     }`}
                   >
                     <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : 'text-[#146C43]'}`} />
-                    <span>{item.label}</span>
+                    <span>{getNavLabel(item.id)}</span>
                   </button>
                 );
               })}
@@ -564,7 +621,7 @@ export default function App() {
               />
               <div className="flex items-center gap-2 text-sm truncate">
                 <span className="font-semibold text-[#146C43] hidden sm:inline whitespace-nowrap">
-                  GKII Sungai Barang
+                  {siteContent.appTitle}
                 </span>
                 <span className="text-[#9AB5A3] hidden sm:inline" aria-hidden="true">
                   /
@@ -574,7 +631,7 @@ export default function App() {
             </div>
           </div>
 
-          <div className="flex items-center gap-4 shrink-0">
+          <div className="flex items-center gap-2.5 sm:gap-3 shrink-0">
             <span className="hidden xl:inline text-xs font-mono tabular-nums text-[#456051] whitespace-nowrap">
               {new Intl.DateTimeFormat('id-ID', {
                 weekday: 'long',
@@ -583,6 +640,19 @@ export default function App() {
                 year: 'numeric',
               }).format(now)}
             </span>
+
+            {isAdmin && (
+              <button
+                type="button"
+                onClick={() => openTextEditor('identitas')}
+                title="Ubah semua isi teks pada aplikasi"
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-[#146C43] bg-[#EAF3EC] hover:bg-[#D8ECDF] text-[#0F5132] text-xs font-semibold whitespace-nowrap cursor-pointer"
+              >
+                <Pencil className="w-3.5 h-3.5 text-[#146C43]" />
+                <span className="hidden sm:inline">Ubah Teks Aplikasi</span>
+                <span className="sm:hidden">Teks</span>
+              </button>
+            )}
 
             <button
               type="button"
@@ -605,12 +675,10 @@ export default function App() {
             >
               <KeyRound className="w-3.5 h-3.5 text-[#146C43]" />
               <span className="hidden sm:inline">
-                {authUser
-                  ? `${isAdmin ? 'Admin' : 'Bendahara'}: ${authUser.name.split(',')[0]}`
-                  : 'Masuk Akun'}
+                {authUser ? authUser.name.split(',')[0] : 'Masuk Akun'}
               </span>
               <span className="sm:hidden">
-                {authUser ? (isAdmin ? 'Admin' : 'Bendahara') : 'Masuk'}
+                {authUser ? 'Akun' : 'Masuk'}
               </span>
             </button>
 
@@ -618,7 +686,7 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => setNotifOpen((v) => !v)}
-                aria-label="Buka pusat notifikasi real-time"
+                aria-label="Buka pusat notifikasi langsung"
                 className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg border border-[#D4E4D8] bg-white hover:bg-[#F5F9F6] text-xs font-semibold text-[#0F2419] whitespace-nowrap cursor-pointer"
               >
                 <Bell className="w-4 h-4 text-[#146C43]" />
@@ -635,7 +703,7 @@ export default function App() {
                   <div className="px-4 py-3 border-b border-[#E6EFE8] bg-[#F5F9F6] flex items-center justify-between">
                     <div>
                       <p className="text-sm font-bold text-[#0F2419]">
-                        Notifikasi Real-Time
+                        Notifikasi Langsung
                       </p>
                       <p className="text-[11px] text-[#456051]">
                         HUT Kelahiran, Pernikahan & Pengingat Rapat
@@ -744,37 +812,45 @@ export default function App() {
               {activeTab === 'beranda' && (
                 <OverviewSection
                   data={data}
+                  siteContent={siteContent}
                   notifications={notifications}
                   canEditAdmin={isAdmin}
                   canUploadGallery={Boolean(authUser)}
                   uploaderName={authUser?.name}
                   onOpenLogin={() => {
                     setAuthError(null);
-                    setLoginIdentifier('sekretaris');
+                    setLoginIdentifier('');
+                    setLoginPassword('');
                     setLoginModalOpen(true);
                   }}
+                  onOpenTextEditor={openTextEditor}
                   onNavigate={selectTab}
                   onUpdateVisionMission={handleUpdateVisionMission}
                   onUpdateChurchIdentity={handleUpdateChurchIdentity}
                   onAddGalleryPhoto={handleAddGalleryPhoto}
+                  onUpdateGalleryPhoto={handleUpdateGalleryPhoto}
                   onDeleteGalleryPhoto={handleDeleteGalleryPhoto}
                 />
               )}
               {activeTab === 'ibadah' && (
                 <WorshipBulletinPrayerSection
                   data={data}
+                  siteContent={siteContent}
                   canEditAdmin={isAdmin}
                   onOpenLogin={() => {
                     setAuthError(null);
-                    setLoginIdentifier('sekretaris');
+                    setLoginIdentifier('');
+                    setLoginPassword('');
                     setLoginModalOpen(true);
                   }}
                   onAddSchedule={handleAddSchedule}
                   onUpdateSchedule={handleUpdateSchedule}
                   onDeleteSchedule={handleDeleteSchedule}
                   onAddAnnouncement={handleAddAnnouncement}
+                  onUpdateAnnouncement={handleUpdateAnnouncement}
                   onDeleteAnnouncement={handleDeleteAnnouncement}
                   onAddPrayer={handleAddPrayer}
+                  onUpdatePrayer={handleUpdatePrayer}
                   onPrayIncrement={handlePrayIncrement}
                   onDeletePrayer={handleDeletePrayer}
                 />
@@ -782,13 +858,17 @@ export default function App() {
               {activeTab === 'renungan' && (
                 <DevotionalShareSection
                   devotionals={data.devotionals}
+                  siteContent={siteContent}
                   canEditAdmin={isAdmin}
                   onAddDevotional={handleAddDevotional}
+                  onUpdateDevotional={handleUpdateDevotional}
+                  onDeleteDevotional={handleDeleteDevotional}
                 />
               )}
               {activeTab === 'kas' && (
                 <TreasuryLedgerSection
                   ledger={data.ledger}
+                  siteContent={siteContent}
                   authUser={authUser}
                   canEditFinance={canEditFinance}
                   logoUrl={data.churchIdentity?.logoUrl}
@@ -815,6 +895,7 @@ export default function App() {
               {activeTab === 'jemaat' && (
                 <MembersCelebrationsSection
                   members={data.members}
+                  siteContent={siteContent}
                   notifications={notifications}
                   now={now}
                   canEditAdmin={isAdmin}
@@ -827,22 +908,27 @@ export default function App() {
                 <GrowthAnalyticsSection
                   growthSeries={data.growthSeries}
                   members={data.members}
+                  siteContent={siteContent}
                 />
               )}
               {activeTab === 'pengurus' && (
                 <LeadershipSection
                   leadership={data.leadership}
+                  siteContent={siteContent}
                   canEditAdmin={isAdmin}
                   onAddLeader={handleAddLeader}
+                  onUpdateLeader={handleUpdateLeader}
                   onDeleteLeader={handleDeleteLeader}
                 />
               )}
               {activeTab === 'kepanitiaan' && (
                 <CommitteeSection
                   committees={data.committees}
+                  siteContent={siteContent}
                   now={now}
                   canEditAdmin={isAdmin}
                   onAddCommittee={handleAddCommittee}
+                  onUpdateCommittee={handleUpdateCommittee}
                   onAddMeeting={handleAddMeeting}
                   onUpdateMeetingStatus={handleUpdateMeetingStatus}
                   onAddTask={handleAddTask}
@@ -853,13 +939,15 @@ export default function App() {
               {activeTab === 'surat' && (
                 <SecretaryLettersSection
                   letters={letters}
+                  siteContent={siteContent}
                   loadingLetters={loadingLetters}
                   canEditAdmin={isAdmin}
                   secretaryName={authUser?.name}
                   logoUrl={data.churchIdentity?.logoUrl}
                   onOpenSecretaryLogin={() => {
                     setAuthError(null);
-                    setLoginIdentifier('sekretaris');
+                    setLoginIdentifier('');
+                    setLoginPassword('');
                     setLoginModalOpen(true);
                   }}
                   onAddLetter={handleAddLetter}
@@ -876,23 +964,34 @@ export default function App() {
         {/* Quiet Footer */}
         <footer className="border-t border-[#D4E4D8] bg-white px-4 sm:px-6 lg:px-8 py-5 text-xs text-[#456051] print:hidden">
           <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
-            <span>Gereja Kemah Injil Indonesia (GKII) · Jemaat Sungai Barang</span>
-            <span>Melayani dengan Kasih, Kebenaran, dan Ketertiban</span>
+            <span>{siteContent.footerOrg}</span>
+            <span>{siteContent.footerMotto}</span>
           </div>
         </footer>
       </div>
 
-      {/* Modal Masuk Akun Pengurus & Admin */}
+      {/* Modal Ubah Semua Teks Aplikasi (Admin) */}
+      {isAdmin && (
+        <SiteTextEditorModal
+          open={textEditorOpen}
+          initialTab={textEditorTab}
+          siteContent={siteContent}
+          onClose={() => setTextEditorOpen(false)}
+          onSave={handleUpdateSiteContent}
+        />
+      )}
+
+      {/* Modal Masuk Akun Pengurus */}
       {loginModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
           <div className="w-full max-w-md rounded-2xl border border-[#D4E4D8] bg-white p-6 space-y-5 shadow-xl">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h2 className="text-lg font-bold text-[#0F2419]">
-                  Masuk Akun Pengurus & Admin
+                  Masuk Akun Pengurus
                 </h2>
                 <p className="text-xs text-[#456051] mt-1">
-                  Masuk sebagai Sekretaris (Admin Penuh seluruh aplikasi) atau Bendahara Jemaat (khusus data keuangan).
+                  Silakan masukkan nama pengguna atau surel serta kata sandi akun Anda.
                 </p>
               </div>
               <button
@@ -905,63 +1004,6 @@ export default function App() {
               </button>
             </div>
 
-            <div className="grid grid-cols-2 gap-2 p-1 rounded-xl bg-[#EAF3EC] border border-[#D4E4D8]">
-              <button
-                type="button"
-                onClick={() => {
-                  setLoginIdentifier('sekretaris');
-                  setLoginPassword('');
-                  setAuthError(null);
-                }}
-                className={`px-3 py-2 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
-                  loginIdentifier.toLowerCase().includes('sekretaris')
-                    ? 'bg-white text-[#0F2419] shadow-xs'
-                    : 'text-[#456051] hover:text-[#0F2419]'
-                }`}
-              >
-                Sekretaris (Admin Penuh)
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setLoginIdentifier('bendahara');
-                  setLoginPassword('');
-                  setAuthError(null);
-                }}
-                className={`px-3 py-2 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
-                  loginIdentifier.toLowerCase().includes('bendahara')
-                    ? 'bg-white text-[#0F2419] shadow-xs'
-                    : 'text-[#456051] hover:text-[#0F2419]'
-                }`}
-              >
-                Bendahara (Keuangan)
-              </button>
-            </div>
-
-            <div className="rounded-xl bg-[#F5F9F6] border border-[#D4E4D8] p-3.5 text-xs text-[#0F2419] space-y-2">
-              <p className="font-semibold text-[#146C43]">Informasi Akun Bawaan:</p>
-              <div className="space-y-1">
-                <p>
-                  <span className="font-semibold">1. Sekretaris (Admin Penuh):</span>{' '}
-                  <span className="font-mono font-bold">sekretaris</span> · Sandi:{' '}
-                  <span className="font-mono font-bold">admin2026</span>
-                </p>
-                <p className="text-[11px] text-[#456051]">
-                  Akses penuh mengubah Visi Misi, Jadwal, Warta, Doa, Renungan, Jemaat, Pengurus, Kepanitiaan, & Keuangan.
-                </p>
-              </div>
-              <div className="space-y-1 pt-1 border-t border-[#E6EFE8]">
-                <p>
-                  <span className="font-semibold">2. Bendahara Jemaat:</span>{' '}
-                  <span className="font-mono font-bold">bendahara</span> · Sandi:{' '}
-                  <span className="font-mono font-bold">gkii2026</span>
-                </p>
-                <p className="text-[11px] text-[#456051]">
-                  Akses khusus mencatat, mengedit, dan menghapus data kas & pembukuan.
-                </p>
-              </div>
-            </div>
-
             {authError && (
               <p className="text-xs font-semibold text-[#B91C1C] bg-red-50 border border-red-200 rounded-lg px-3 py-2">
                 {authError}
@@ -970,12 +1012,13 @@ export default function App() {
 
             <form onSubmit={handleLoginSubmit} className="space-y-4">
               <label className="block space-y-1.5 text-sm">
-                <span className="font-medium text-[#0F2419]">Username / Email Akun</span>
+                <span className="font-medium text-[#0F2419]">Nama Pengguna / Surel</span>
                 <input
                   required
                   type="text"
                   value={loginIdentifier}
                   onChange={(e) => setLoginIdentifier(e.target.value)}
+                  placeholder="Masukkan nama pengguna atau surel"
                   className="w-full px-3.5 py-2.5 rounded-lg border border-[#D4E4D8] text-[#0F2419] focus:outline-none focus:border-[#146C43]"
                 />
               </label>
@@ -986,7 +1029,7 @@ export default function App() {
                   type="password"
                   value={loginPassword}
                   onChange={(e) => setLoginPassword(e.target.value)}
-                  placeholder="Masukkan kata sandi akun"
+                  placeholder="Masukkan kata sandi"
                   className="w-full px-3.5 py-2.5 rounded-lg border border-[#D4E4D8] text-[#0F2419] focus:outline-none focus:border-[#146C43]"
                 />
               </label>
@@ -1017,12 +1060,10 @@ export default function App() {
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h2 className="text-lg font-bold text-[#0F2419]">
-                  Pengaturan Akun ({authUser.role})
+                  Pengaturan Akun Pengurus
                 </h2>
                 <p className="text-xs text-[#456051] mt-1">
-                  {isAdmin
-                    ? 'Anda masuk sebagai Sekretaris Admin dengan akses penuh ke seluruh modul aplikasi.'
-                    : 'Anda masuk sebagai Bendahara Jemaat dengan izin pengelolaan data keuangan.'}
+                  Perbarui nama tampilan dan kata sandi akun Anda secara berkala.
                 </p>
               </div>
               <button

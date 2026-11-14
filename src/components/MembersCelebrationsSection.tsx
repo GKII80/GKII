@@ -19,6 +19,7 @@ import {
   LiveNotification,
   Member,
   OrganPelayanan,
+  SiteTextContent,
 } from '../types';
 import {
   calculateTurningAge,
@@ -30,9 +31,11 @@ import {
   exportMembersToCsv,
   exportMembersToExcel,
 } from '../lib/membersExport';
+import { DEFAULT_SITE_CONTENT } from '../lib/siteContentDefaults';
 
 interface MembersCelebrationsSectionProps {
   members: Member[];
+  siteContent?: SiteTextContent;
   notifications: LiveNotification[];
   now: Date;
   canEditAdmin: boolean;
@@ -126,6 +129,7 @@ function parseBirthParts(ymd: string) {
 
 export const MembersCelebrationsSection: React.FC<MembersCelebrationsSectionProps> = ({
   members,
+  siteContent,
   notifications,
   now,
   canEditAdmin,
@@ -400,7 +404,7 @@ export const MembersCelebrationsSection: React.FC<MembersCelebrationsSectionProp
     if (filteredMembers.length === 0) return;
     exportMembersToCsv(filteredMembers, activeFilterLabel);
     setExportNotice(
-      `File CSV (${filteredMembers.length} data jemaat) berhasil diunduh.`
+      `Berkas CSV (${filteredMembers.length} data jemaat) berhasil diunduh.`
     );
     setTimeout(() => setExportNotice(null), 4000);
   };
@@ -409,7 +413,7 @@ export const MembersCelebrationsSection: React.FC<MembersCelebrationsSectionProp
     if (filteredMembers.length === 0) return;
     exportMembersToExcel(filteredMembers, activeFilterLabel);
     setExportNotice(
-      `File Excel .xlsx (${filteredMembers.length} data jemaat + Ringkasan Statistik) berhasil diunduh.`
+      `Berkas Excel .xlsx (${filteredMembers.length} data jemaat + Ringkasan Statistik) berhasil diunduh.`
     );
     setTimeout(() => setExportNotice(null), 4000);
   };
@@ -419,10 +423,12 @@ export const MembersCelebrationsSection: React.FC<MembersCelebrationsSectionProp
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-[#0F2419]">
-            Data Jemaat, Ulang Tahun & Pernikahan
+            {siteContent?.sections.jemaatTitle ||
+              DEFAULT_SITE_CONTENT.sections.jemaatTitle}
           </h1>
           <p className="text-sm text-[#456051] mt-1">
-            Buku induk jemaat (KK, NIK, kelahiran, hubungan keluarga, pernikahan, & baptisan) serta pengingat hari spesial real-time.
+            {siteContent?.sections.jemaatSubtitle ||
+              DEFAULT_SITE_CONTENT.sections.jemaatSubtitle}
           </p>
         </div>
 
@@ -654,7 +660,7 @@ export const MembersCelebrationsSection: React.FC<MembersCelebrationsSectionProp
         <section className="rounded-2xl border border-[#BFE0C9] bg-[#EAF3EC] p-5 space-y-3">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <p className="text-sm font-bold text-[#0F2419]">
-              Notifikasi Otomatis Real-Time: {todayAlerts.length} Perayaan Hari Ini
+              Notifikasi Otomatis Langsung: {todayAlerts.length} Perayaan Hari Ini
             </p>
             <span className="text-xs font-mono tabular-nums text-[#146C43]">
               Diperbarui otomatis: {now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })} WIB
@@ -698,7 +704,7 @@ export const MembersCelebrationsSection: React.FC<MembersCelebrationsSectionProp
         >
           <div className="flex items-center justify-between gap-3">
             <h2 className="text-lg font-bold text-[#0F2419]">
-              {editingMemberId ? 'Edit Data Anggota Jemaat' : 'Tambah Anggota Jemaat Baru'}
+              {editingMemberId ? 'Ubah Data Anggota Jemaat' : 'Tambah Anggota Jemaat Baru'}
             </h2>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -1068,7 +1074,7 @@ export const MembersCelebrationsSection: React.FC<MembersCelebrationsSectionProp
 
             <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2.5">
               <select
-                aria-label="Filter status baptisan"
+                aria-label="Saring status baptisan"
                 value={baptismFilter}
                 onChange={(e) =>
                   setBaptismFilter(e.target.value as 'Semua' | BaptismStatus)
@@ -1081,7 +1087,7 @@ export const MembersCelebrationsSection: React.FC<MembersCelebrationsSectionProp
               </select>
 
               <select
-                aria-label="Filter status pernikahan"
+                aria-label="Saring status pernikahan"
                 value={marriageFilter}
                 onChange={(e) =>
                   setMarriageFilter(
@@ -1112,7 +1118,7 @@ export const MembersCelebrationsSection: React.FC<MembersCelebrationsSectionProp
             <span className="tabular-nums">
               Menampilkan <strong className="text-[#0F2419]">{filteredMembers.length}</strong> dari{' '}
               <strong className="text-[#0F2419]">{members.length}</strong> anggota jemaat
-              {isFiltered ? ` (Filter aktif: ${activeFilterLabel})` : ''}
+              {isFiltered ? ` (Penyaringan aktif: ${activeFilterLabel})` : ''}
             </span>
             {isFiltered && (
               <button
@@ -1125,7 +1131,7 @@ export const MembersCelebrationsSection: React.FC<MembersCelebrationsSectionProp
                 }}
                 className="font-semibold text-[#146C43] hover:underline cursor-pointer"
               >
-                Reset Semua Filter
+                Atur Ulang Penyaringan
               </button>
             )}
           </div>
@@ -1215,7 +1221,7 @@ export const MembersCelebrationsSection: React.FC<MembersCelebrationsSectionProp
                         <button
                           type="button"
                           onClick={() => handleStartEdit(m)}
-                          title="Edit data jemaat"
+                          title="Ubah data jemaat"
                           className="p-1.5 rounded-lg text-[#6B8576] hover:text-[#146C43] hover:bg-[#EAF3EC] transition-colors cursor-pointer"
                         >
                           <Pencil className="w-4 h-4" />

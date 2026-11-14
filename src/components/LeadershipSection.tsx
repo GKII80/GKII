@@ -4,17 +4,24 @@ import {
   Copy,
   Mail,
   MessageCircle,
+  Pencil,
   Phone,
   Plus,
   Trash2,
 } from 'lucide-react';
-import { LeadershipMember } from '../types';
+import { LeadershipMember, SiteTextContent } from '../types';
 import { toWhatsAppUrl } from '../lib/dateAndFormat';
+import { DEFAULT_SITE_CONTENT } from '../lib/siteContentDefaults';
 
 interface LeadershipSectionProps {
   leadership: LeadershipMember[];
+  siteContent?: SiteTextContent;
   canEditAdmin: boolean;
   onAddLeader: (leader: Omit<LeadershipMember, 'id' | 'order'>) => Promise<void>;
+  onUpdateLeader: (
+    id: string,
+    leader: Omit<LeadershipMember, 'id' | 'order'>
+  ) => Promise<void>;
   onDeleteLeader: (id: string) => Promise<void>;
 }
 
@@ -29,15 +36,18 @@ function getInitials(name: string): string {
 
 export const LeadershipSection: React.FC<LeadershipSectionProps> = ({
   leadership,
+  siteContent,
   canEditAdmin,
   onAddLeader,
+  onUpdateLeader,
   onDeleteLeader,
 }) => {
   const [copiedPhoneId, setCopiedPhoneId] = useState<string | null>(null);
   const [imgFailed, setImgFailed] = useState<Record<string, boolean>>({});
   const [showForm, setShowForm] = useState(false);
+  const [editingLeaderId, setEditingLeaderId] = useState<string | null>(null);
 
-  const [form, setForm] = useState({
+  const emptyForm = () => ({
     name: '',
     role: '',
     period: '2024 – 2028',
@@ -47,6 +57,7 @@ export const LeadershipSection: React.FC<LeadershipSectionProps> = ({
     bio: '',
     responsibilitiesText: '',
   });
+  const [form, setForm] = useState(emptyForm);
 
   const handleCopyPhone = async (id: string, phone: string) => {
     try {
@@ -66,7 +77,7 @@ export const LeadershipSection: React.FC<LeadershipSectionProps> = ({
       .map((r) => r.trim())
       .filter(Boolean);
 
-    await onAddLeader({
+    const payload: Omit<LeadershipMember, 'id' | 'order'> = {
       name: form.name,
       role: form.role,
       period: form.period,
@@ -78,18 +89,31 @@ export const LeadershipSection: React.FC<LeadershipSectionProps> = ({
         responsibilities.length > 0
           ? responsibilities
           : ['Melaksanakan tugas pelayanan sesuai bidang tanggung jawab BPJ.'],
-    });
-    setForm({
-      name: '',
-      role: '',
-      period: '2024 – 2028',
-      phone: '',
-      email: '',
-      photoUrl: '',
-      bio: '',
-      responsibilitiesText: '',
-    });
+    };
+
+    if (editingLeaderId) {
+      await onUpdateLeader(editingLeaderId, payload);
+    } else {
+      await onAddLeader(payload);
+    }
+    setForm(emptyForm());
+    setEditingLeaderId(null);
     setShowForm(false);
+  };
+
+  const handleStartEdit = (leader: LeadershipMember) => {
+    setEditingLeaderId(leader.id);
+    setForm({
+      name: leader.name,
+      role: leader.role,
+      period: leader.period,
+      phone: leader.phone,
+      email: leader.email,
+      photoUrl: leader.photoUrl,
+      bio: leader.bio,
+      responsibilitiesText: leader.responsibilities.join('\n'),
+    });
+    setShowForm(true);
   };
 
   return (
@@ -97,17 +121,28 @@ export const LeadershipSection: React.FC<LeadershipSectionProps> = ({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-[#0F2419]">
-            Badan Pengurus Jemaat (BPJ)
+            {siteContent?.sections.pengurusTitle ||
+              DEFAULT_SITE_CONTENT.sections.pengurusTitle}
           </h1>
           <p className="text-sm text-[#456051] mt-1">
-            Struktur pengurus, kontak pelayanan langsung, serta deskripsi tanggung jawab masing-masing pengurus GKII Sungai Barang.
+            {siteContent?.sections.pengurusSubtitle ||
+              DEFAULT_SITE_CONTENT.sections.pengurusSubtitle}
           </p>
         </div>
 
         {canEditAdmin && (
           <button
             type="button"
-            onClick={() => setShowForm((v) => !v)}
+            onClick={() => {
+              if (showForm && editingLeaderId) {
+                setEditingLeaderId(null);
+                setForm(emptyForm());
+              } else {
+                setEditingLeaderId(null);
+                setForm(emptyForm());
+                setShowForm((v) => !v);
+              }
+            }}
             className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-[#146C43] hover:bg-[#0F5132] text-white text-sm font-semibold whitespace-nowrap shrink-0 cursor-pointer"
           >
             <Plus className="w-4 h-4" />
@@ -121,7 +156,9 @@ export const LeadershipSection: React.FC<LeadershipSectionProps> = ({
           onSubmit={handleSubmit}
           className="rounded-2xl border border-[#BFE0C9] bg-white p-6 space-y-4"
         >
-          <h2 className="text-lg font-bold text-[#0F2419]">Tambah Anggota Badan Pengurus</h2>
+          <h2 className="text-lg font-bold text-[#0F2419]">
+            {editingLeaderId ? 'Perbarui Data Badan Pengurus' : 'Tambah Anggota Badan Pengurus'}
+          </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <label className="space-y-1.5 text-sm">
               <span className="font-medium text-[#0F2419]">Nama & Gelar</span>
@@ -157,6 +194,16 @@ export const LeadershipSection: React.FC<LeadershipSectionProps> = ({
               />
             </label>
             <label className="space-y-1.5 text-sm">
+              <span className="font-medium text-[#0F2419]">Surel Pelayanan</span>
+              <input
+                type="email"
+                value={form.email}
+                onChange={(e) => setForm({ ...form, email: e.target.value })}
+                placeholder="sekretariat@gkiisungaibarang.or.id"
+                className="w-full px-3.5 py-2.5 rounded-lg border border-[#D4E4D8] text-[#0F2419] focus:outline-none focus:border-[#146C43]"
+              />
+            </label>
+            <label className="space-y-1.5 text-sm">
               <span className="font-medium text-[#0F2419]">Masa Bakti</span>
               <input
                 required
@@ -166,7 +213,7 @@ export const LeadershipSection: React.FC<LeadershipSectionProps> = ({
                 className="w-full px-3.5 py-2.5 rounded-lg border border-[#D4E4D8] text-[#0F2419] focus:outline-none focus:border-[#146C43]"
               />
             </label>
-            <label className="space-y-1.5 text-sm md:col-span-2">
+            <label className="space-y-1.5 text-sm">
               <span className="font-medium text-[#0F2419]">Deskripsi Singkat Profil</span>
               <input
                 type="text"
@@ -195,11 +242,15 @@ export const LeadershipSection: React.FC<LeadershipSectionProps> = ({
               type="submit"
               className="px-5 py-2.5 rounded-lg bg-[#146C43] hover:bg-[#0F5132] text-white text-sm font-semibold cursor-pointer"
             >
-              Simpan Pengurus
+              {editingLeaderId ? 'Simpan Perubahan Pengurus' : 'Simpan Pengurus'}
             </button>
             <button
               type="button"
-              onClick={() => setShowForm(false)}
+              onClick={() => {
+                setEditingLeaderId(null);
+                setForm(emptyForm());
+                setShowForm(false);
+              }}
               className="px-5 py-2.5 rounded-lg border border-[#D4E4D8] text-[#456051] text-sm font-medium cursor-pointer"
             >
               Batal
@@ -253,14 +304,24 @@ export const LeadershipSection: React.FC<LeadershipSectionProps> = ({
                     </div>
                   </div>
                   {canEditAdmin && (
-                    <button
-                      type="button"
-                      onClick={() => onDeleteLeader(leader.id)}
-                      title="Hapus data pengurus"
-                      className="p-2 rounded-lg text-[#6B8576] hover:text-[#B91C1C] hover:bg-red-50 transition-colors cursor-pointer shrink-0"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => handleStartEdit(leader)}
+                        title="Ubah data pengurus"
+                        className="p-2 rounded-lg text-[#6B8576] hover:text-[#146C43] hover:bg-[#EAF3EC] transition-colors cursor-pointer"
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onDeleteLeader(leader.id)}
+                        title="Hapus data pengurus"
+                        className="p-2 rounded-lg text-[#6B8576] hover:text-[#B91C1C] hover:bg-red-50 transition-colors cursor-pointer"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   )}
                 </div>
 

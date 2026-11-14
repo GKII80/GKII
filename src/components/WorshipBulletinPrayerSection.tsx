@@ -18,20 +18,28 @@ import {
   ChurchAnnouncement,
   ChurchDatabase,
   DailyPrayer,
+  SiteTextContent,
   WorshipSchedule,
 } from '../types';
 import { formatIndonesianDate } from '../lib/dateAndFormat';
+import { DEFAULT_SITE_CONTENT } from '../lib/siteContentDefaults';
 
 interface WorshipBulletinPrayerSectionProps {
   data: ChurchDatabase;
+  siteContent?: SiteTextContent;
   canEditAdmin: boolean;
   onOpenLogin: () => void;
   onAddSchedule: (item: Omit<WorshipSchedule, 'id'>) => Promise<void>;
   onUpdateSchedule: (id: string, item: Omit<WorshipSchedule, 'id'>) => Promise<void>;
   onDeleteSchedule: (id: string) => Promise<void>;
   onAddAnnouncement: (item: Omit<ChurchAnnouncement, 'id'>) => Promise<void>;
+  onUpdateAnnouncement: (id: string, item: Omit<ChurchAnnouncement, 'id'>) => Promise<void>;
   onDeleteAnnouncement: (id: string) => Promise<void>;
   onAddPrayer: (item: Omit<DailyPrayer, 'id' | 'prayedCount'>) => Promise<void>;
+  onUpdatePrayer: (
+    id: string,
+    item: Omit<DailyPrayer, 'id' | 'prayedCount'>
+  ) => Promise<void>;
   onPrayIncrement: (id: string) => Promise<void>;
   onDeletePrayer: (id: string) => Promise<void>;
 }
@@ -40,14 +48,17 @@ type SubTab = 'jadwal' | 'warta' | 'doa';
 
 export const WorshipBulletinPrayerSection: React.FC<WorshipBulletinPrayerSectionProps> = ({
   data,
+  siteContent,
   canEditAdmin,
   onOpenLogin,
   onAddSchedule,
   onUpdateSchedule,
   onDeleteSchedule,
   onAddAnnouncement,
+  onUpdateAnnouncement,
   onDeleteAnnouncement,
   onAddPrayer,
+  onUpdatePrayer,
   onPrayIncrement,
   onDeletePrayer,
 }) => {
@@ -56,6 +67,8 @@ export const WorshipBulletinPrayerSection: React.FC<WorshipBulletinPrayerSection
   const [searchQuery, setSearchQuery] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [editingScheduleId, setEditingScheduleId] = useState<string | null>(null);
+  const [editingAnnouncementId, setEditingAnnouncementId] = useState<string | null>(null);
+  const [editingPrayerId, setEditingPrayerId] = useState<string | null>(null);
 
   // Schedule Form
   const emptyScheduleForm = (): Omit<WorshipSchedule, 'id'> => ({
@@ -74,7 +87,7 @@ export const WorshipBulletinPrayerSection: React.FC<WorshipBulletinPrayerSection
   const [schForm, setSchForm] = useState<Omit<WorshipSchedule, 'id'>>(emptyScheduleForm);
 
   // Announcement Form
-  const [annForm, setAnnForm] = useState<Omit<ChurchAnnouncement, 'id'>>({
+  const emptyAnnouncementForm = (): Omit<ChurchAnnouncement, 'id'> => ({
     title: '',
     date: new Date().toISOString().slice(0, 10),
     category: 'Kegiatan Gereja',
@@ -82,9 +95,10 @@ export const WorshipBulletinPrayerSection: React.FC<WorshipBulletinPrayerSection
     content: '',
     author: 'Sekretariat BPJ',
   });
+  const [annForm, setAnnForm] = useState<Omit<ChurchAnnouncement, 'id'>>(emptyAnnouncementForm);
 
   // Prayer Form
-  const [pryForm, setPryForm] = useState({
+  const emptyPrayerForm = () => ({
     title: '',
     category: 'Pelayanan Gereja' as DailyPrayer['category'],
     verseRef: '',
@@ -92,6 +106,7 @@ export const WorshipBulletinPrayerSection: React.FC<WorshipBulletinPrayerSection
     guideStepsText: '',
     date: new Date().toISOString().slice(0, 10),
   });
+  const [pryForm, setPryForm] = useState(emptyPrayerForm);
 
   const [prayedLocal, setPrayedLocal] = useState<Record<string, boolean>>({});
 
@@ -182,16 +197,28 @@ export const WorshipBulletinPrayerSection: React.FC<WorshipBulletinPrayerSection
   const handleAnnouncementSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!annForm.title.trim()) return;
-    await onAddAnnouncement(annForm);
-    setAnnForm({
-      title: '',
-      date: new Date().toISOString().slice(0, 10),
-      category: 'Kegiatan Gereja',
-      summary: '',
-      content: '',
-      author: 'Sekretariat BPJ',
-    });
+    if (editingAnnouncementId) {
+      await onUpdateAnnouncement(editingAnnouncementId, annForm);
+    } else {
+      await onAddAnnouncement(annForm);
+    }
+    setAnnForm(emptyAnnouncementForm());
+    setEditingAnnouncementId(null);
     setShowForm(false);
+  };
+
+  const handleStartEditAnnouncement = (ann: ChurchAnnouncement) => {
+    setSubTab('warta');
+    setEditingAnnouncementId(ann.id);
+    setAnnForm({
+      title: ann.title,
+      date: ann.date,
+      category: ann.category,
+      summary: ann.summary,
+      content: ann.content,
+      author: ann.author,
+    });
+    setShowForm(true);
   };
 
   const handlePrayerSubmit = async (e: React.FormEvent) => {
@@ -201,25 +228,41 @@ export const WorshipBulletinPrayerSection: React.FC<WorshipBulletinPrayerSection
       .split('\n')
       .map((s) => s.trim())
       .filter(Boolean);
-    await onAddPrayer({
+    const payload: Omit<DailyPrayer, 'id' | 'prayedCount'> = {
       title: pryForm.title,
       category: pryForm.category,
       verseRef: pryForm.verseRef || 'Filipi 4:6',
       verseText:
         pryForm.verseText ||
         'Janganlah hendaknya kamu kuatir tentang apapun juga, tetapi nyatakanlah dalam segala hal keinginanmu kepada Allah dalam doa dan permohonan dengan ucapan syukur.',
-      guideSteps: steps.length > 0 ? steps : ['Naikkan ucapan syukur dan doa permohonan bersama keluarga.'],
+      guideSteps:
+        steps.length > 0
+          ? steps
+          : ['Naikkan ucapan syukur dan doa permohonan bersama keluarga.'],
       date: pryForm.date,
-    });
-    setPryForm({
-      title: '',
-      category: 'Pelayanan Gereja',
-      verseRef: '',
-      verseText: '',
-      guideStepsText: '',
-      date: new Date().toISOString().slice(0, 10),
-    });
+    };
+    if (editingPrayerId) {
+      await onUpdatePrayer(editingPrayerId, payload);
+    } else {
+      await onAddPrayer(payload);
+    }
+    setPryForm(emptyPrayerForm());
+    setEditingPrayerId(null);
     setShowForm(false);
+  };
+
+  const handleStartEditPrayer = (prayer: DailyPrayer) => {
+    setSubTab('doa');
+    setEditingPrayerId(prayer.id);
+    setPryForm({
+      title: prayer.title,
+      category: prayer.category,
+      verseRef: prayer.verseRef,
+      verseText: prayer.verseText,
+      guideStepsText: prayer.guideSteps.join('\n'),
+      date: prayer.date,
+    });
+    setShowForm(true);
   };
 
   return (
@@ -228,10 +271,11 @@ export const WorshipBulletinPrayerSection: React.FC<WorshipBulletinPrayerSection
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-[#0F2419]">
-            Jadwal Ibadah, Warta Gereja & Panduan Doa Harian
+            {siteContent?.sections.ibadahTitle || DEFAULT_SITE_CONTENT.sections.ibadahTitle}
           </h1>
           <p className="text-sm text-[#456051] mt-1">
-            Informasi pelayanan mingguan, pengumuman resmi jemaat, dan pokok doa syafaat harian.
+            {siteContent?.sections.ibadahSubtitle ||
+              DEFAULT_SITE_CONTENT.sections.ibadahSubtitle}
           </p>
         </div>
 
@@ -239,12 +283,23 @@ export const WorshipBulletinPrayerSection: React.FC<WorshipBulletinPrayerSection
           <button
             type="button"
             onClick={() => {
-              if (showForm && editingScheduleId) {
+              if (
+                showForm &&
+                (editingScheduleId || editingAnnouncementId || editingPrayerId)
+              ) {
                 setEditingScheduleId(null);
+                setEditingAnnouncementId(null);
+                setEditingPrayerId(null);
                 setSchForm(emptyScheduleForm());
+                setAnnForm(emptyAnnouncementForm());
+                setPryForm(emptyPrayerForm());
               } else {
                 setEditingScheduleId(null);
+                setEditingAnnouncementId(null);
+                setEditingPrayerId(null);
                 setSchForm(emptyScheduleForm());
+                setAnnForm(emptyAnnouncementForm());
+                setPryForm(emptyPrayerForm());
                 setShowForm((v) => !v);
               }
             }}
@@ -266,7 +321,7 @@ export const WorshipBulletinPrayerSection: React.FC<WorshipBulletinPrayerSection
             className="inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-lg border border-[#D4E4D8] bg-white hover:bg-[#F5F9F6] text-[#0F2419] text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer"
           >
             <KeyRound className="w-3.5 h-3.5 text-[#146C43]" />
-            <span>Kelola (Sekretaris Admin)</span>
+            <span>Masuk Pengurus</span>
           </button>
         )}
       </div>
@@ -278,6 +333,9 @@ export const WorshipBulletinPrayerSection: React.FC<WorshipBulletinPrayerSection
             type="button"
             onClick={() => {
               setSubTab('jadwal');
+              setEditingScheduleId(null);
+              setEditingAnnouncementId(null);
+              setEditingPrayerId(null);
               setShowForm(false);
             }}
             className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors whitespace-nowrap cursor-pointer ${
@@ -292,6 +350,9 @@ export const WorshipBulletinPrayerSection: React.FC<WorshipBulletinPrayerSection
             type="button"
             onClick={() => {
               setSubTab('warta');
+              setEditingScheduleId(null);
+              setEditingAnnouncementId(null);
+              setEditingPrayerId(null);
               setShowForm(false);
             }}
             className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors whitespace-nowrap cursor-pointer ${
@@ -306,6 +367,9 @@ export const WorshipBulletinPrayerSection: React.FC<WorshipBulletinPrayerSection
             type="button"
             onClick={() => {
               setSubTab('doa');
+              setEditingScheduleId(null);
+              setEditingAnnouncementId(null);
+              setEditingPrayerId(null);
               setShowForm(false);
             }}
             className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors whitespace-nowrap cursor-pointer ${
@@ -499,7 +563,9 @@ export const WorshipBulletinPrayerSection: React.FC<WorshipBulletinPrayerSection
           onSubmit={handleAnnouncementSubmit}
           className="rounded-2xl border border-[#BFE0C9] bg-white p-6 space-y-4"
         >
-          <h2 className="text-lg font-bold text-[#0F2419]">Terbitkan Warta Gereja</h2>
+          <h2 className="text-lg font-bold text-[#0F2419]">
+            {editingAnnouncementId ? 'Perbarui Warta Gereja' : 'Terbitkan Warta Gereja'}
+          </h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <label className="space-y-1.5 text-sm md:col-span-2">
               <span className="font-medium text-[#0F2419]">Judul Warta</span>
@@ -540,7 +606,17 @@ export const WorshipBulletinPrayerSection: React.FC<WorshipBulletinPrayerSection
                 className="w-full px-3.5 py-2.5 rounded-lg border border-[#D4E4D8] text-[#0F2419] focus:outline-none focus:border-[#146C43]"
               />
             </label>
-            <label className="space-y-1.5 text-sm md:col-span-2">
+            <label className="space-y-1.5 text-sm">
+              <span className="font-medium text-[#0F2419]">Penulis / Penerbit</span>
+              <input
+                required
+                type="text"
+                value={annForm.author}
+                onChange={(e) => setAnnForm({ ...annForm, author: e.target.value })}
+                className="w-full px-3.5 py-2.5 rounded-lg border border-[#D4E4D8] text-[#0F2419] focus:outline-none focus:border-[#146C43]"
+              />
+            </label>
+            <label className="space-y-1.5 text-sm">
               <span className="font-medium text-[#0F2419]">Ringkasan Singkat</span>
               <input
                 required
@@ -567,11 +643,15 @@ export const WorshipBulletinPrayerSection: React.FC<WorshipBulletinPrayerSection
               type="submit"
               className="px-5 py-2.5 rounded-lg bg-[#146C43] hover:bg-[#0F5132] text-white text-sm font-semibold cursor-pointer"
             >
-              Terbitkan Warta
+              {editingAnnouncementId ? 'Simpan Perubahan Warta' : 'Terbitkan Warta'}
             </button>
             <button
               type="button"
-              onClick={() => setShowForm(false)}
+              onClick={() => {
+                setEditingAnnouncementId(null);
+                setAnnForm(emptyAnnouncementForm());
+                setShowForm(false);
+              }}
               className="px-5 py-2.5 rounded-lg border border-[#D4E4D8] text-[#456051] hover:text-[#0F2419] text-sm font-medium cursor-pointer"
             >
               Batal
@@ -585,7 +665,9 @@ export const WorshipBulletinPrayerSection: React.FC<WorshipBulletinPrayerSection
           onSubmit={handlePrayerSubmit}
           className="rounded-2xl border border-[#BFE0C9] bg-white p-6 space-y-4"
         >
-          <h2 className="text-lg font-bold text-[#0F2419]">Tambah Panduan Pokok Doa Harian</h2>
+          <h2 className="text-lg font-bold text-[#0F2419]">
+            {editingPrayerId ? 'Perbarui Panduan Pokok Doa Harian' : 'Tambah Panduan Pokok Doa Harian'}
+          </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <label className="space-y-1.5 text-sm">
               <span className="font-medium text-[#0F2419]">Judul Pokok Doa</span>
@@ -625,6 +707,16 @@ export const WorshipBulletinPrayerSection: React.FC<WorshipBulletinPrayerSection
               />
             </label>
             <label className="space-y-1.5 text-sm">
+              <span className="font-medium text-[#0F2419]">Tanggal Pokok Doa</span>
+              <input
+                required
+                type="date"
+                value={pryForm.date}
+                onChange={(e) => setPryForm({ ...pryForm, date: e.target.value })}
+                className="w-full px-3.5 py-2.5 rounded-lg border border-[#D4E4D8] text-[#0F2419] focus:outline-none focus:border-[#146C43]"
+              />
+            </label>
+            <label className="space-y-1.5 text-sm md:col-span-2">
               <span className="font-medium text-[#0F2419]">Isi Ayat Pegangan</span>
               <input
                 type="text"
@@ -652,11 +744,15 @@ export const WorshipBulletinPrayerSection: React.FC<WorshipBulletinPrayerSection
               type="submit"
               className="px-5 py-2.5 rounded-lg bg-[#146C43] hover:bg-[#0F5132] text-white text-sm font-semibold cursor-pointer"
             >
-              Simpan Pokok Doa
+              {editingPrayerId ? 'Simpan Perubahan Doa' : 'Simpan Pokok Doa'}
             </button>
             <button
               type="button"
-              onClick={() => setShowForm(false)}
+              onClick={() => {
+                setEditingPrayerId(null);
+                setPryForm(emptyPrayerForm());
+                setShowForm(false);
+              }}
               className="px-5 py-2.5 rounded-lg border border-[#D4E4D8] text-[#456051] hover:text-[#0F2419] text-sm font-medium cursor-pointer"
             >
               Batal
@@ -691,7 +787,7 @@ export const WorshipBulletinPrayerSection: React.FC<WorshipBulletinPrayerSection
                 Belum ada jadwal ibadah yang sesuai pencarian
               </p>
               <p className="text-sm text-[#456051]">
-                Ubah filter kategori atau tambahkan jadwal ibadah baru.
+                Ubah pilihan kategori atau tambahkan jadwal ibadah baru.
               </p>
             </div>
           ) : (
@@ -712,7 +808,7 @@ export const WorshipBulletinPrayerSection: React.FC<WorshipBulletinPrayerSection
                           <button
                             type="button"
                             onClick={() => handleStartEditSchedule(item)}
-                            title="Edit jadwal ibadah"
+                            title="Ubah jadwal ibadah"
                             className="p-2 rounded-lg text-[#6B8576] hover:text-[#146C43] hover:bg-[#EAF3EC] transition-colors cursor-pointer"
                           >
                             <Pencil className="w-4 h-4" />
@@ -829,14 +925,24 @@ export const WorshipBulletinPrayerSection: React.FC<WorshipBulletinPrayerSection
                     <h3 className="text-xl font-bold text-[#0F2419]">{ann.title}</h3>
                   </div>
                   {canEditAdmin && (
-                    <button
-                      type="button"
-                      onClick={() => onDeleteAnnouncement(ann.id)}
-                      title="Hapus warta"
-                      className="p-2 rounded-lg text-[#6B8576] hover:text-[#B91C1C] hover:bg-red-50 transition-colors cursor-pointer"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => handleStartEditAnnouncement(ann)}
+                        title="Ubah warta gereja"
+                        className="p-2 rounded-lg text-[#6B8576] hover:text-[#146C43] hover:bg-[#EAF3EC] transition-colors cursor-pointer"
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onDeleteAnnouncement(ann.id)}
+                        title="Hapus warta"
+                        className="p-2 rounded-lg text-[#6B8576] hover:text-[#B91C1C] hover:bg-red-50 transition-colors cursor-pointer"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   )}
                 </div>
                 <p className="text-sm font-medium text-[#2D4D3B]">{ann.summary}</p>
@@ -868,14 +974,24 @@ export const WorshipBulletinPrayerSection: React.FC<WorshipBulletinPrayerSection
                       <h3 className="text-lg font-bold text-[#0F2419] mt-1">{prayer.title}</h3>
                     </div>
                     {canEditAdmin && (
-                      <button
-                        type="button"
-                        onClick={() => onDeletePrayer(prayer.id)}
-                        title="Hapus pokok doa"
-                        className="p-2 rounded-lg text-[#6B8576] hover:text-[#B91C1C] hover:bg-red-50 transition-colors cursor-pointer"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => handleStartEditPrayer(prayer)}
+                          title="Ubah pokok doa"
+                          className="p-2 rounded-lg text-[#6B8576] hover:text-[#146C43] hover:bg-[#EAF3EC] transition-colors cursor-pointer"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => onDeletePrayer(prayer.id)}
+                          title="Hapus pokok doa"
+                          className="p-2 rounded-lg text-[#6B8576] hover:text-[#B91C1C] hover:bg-red-50 transition-colors cursor-pointer"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     )}
                   </div>
 

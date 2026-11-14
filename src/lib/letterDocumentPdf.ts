@@ -21,7 +21,8 @@ async function loadLogoBase64(logoUrl?: string): Promise<string | null> {
 
 export async function generateChurchLetterPdf(
   letter: ChurchLetter,
-  logoUrl?: string
+  logoUrl?: string,
+  kopLines?: { kopAddressLine?: string; kopRegionLine?: string }
 ): Promise<void> {
   const doc = new jsPDF({
     orientation: 'portrait',
@@ -59,14 +60,21 @@ export async function generateChurchLetterPdf(
   doc.setFontSize(8.5);
   doc.setTextColor(69, 96, 81);
   doc.text(
-    'Desa Sungai Barang, Kecamatan Kayan Selatan · Kabupaten Malinau · Kalimantan Utara',
+    kopLines?.kopAddressLine ||
+      'Desa Sungai Barang, Kecamatan Kayan Selatan · Kabupaten Malinau · Kalimantan Utara',
     textCenterX,
     29.5,
     { align: 'center' }
   );
-  doc.text('Sekretariat & Pelayanan Jemaat · GKII Daerah Kalimantan Utara', textCenterX, 34, {
-    align: 'center',
-  });
+  doc.text(
+    kopLines?.kopRegionLine ||
+      'Sekretariat & Pelayanan Jemaat · GKII Daerah Kalimantan Utara',
+    textCenterX,
+    34,
+    {
+      align: 'center',
+    }
+  );
 
   // Double horizontal letterhead line
   doc.setDrawColor(20, 108, 67);

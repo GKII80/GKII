@@ -5,6 +5,7 @@ import {
   CheckCircle2,
   Clock,
   MapPin,
+  Pencil,
   Plus,
   Trash2,
 } from 'lucide-react';
@@ -12,14 +13,17 @@ import {
   Committee,
   CommitteeMeeting,
   CommitteeTask,
+  SiteTextContent,
 } from '../types';
 import {
   formatDateTimeID,
   formatIndonesianDate,
 } from '../lib/dateAndFormat';
+import { DEFAULT_SITE_CONTENT } from '../lib/siteContentDefaults';
 
 interface CommitteeSectionProps {
   committees: Committee[];
+  siteContent?: SiteTextContent;
   now: Date;
   canEditAdmin: boolean;
   onAddCommittee: (item: {
@@ -28,6 +32,15 @@ interface CommitteeSectionProps {
     description: string;
     chairperson: string;
   }) => Promise<void>;
+  onUpdateCommittee: (
+    id: string,
+    item: {
+      name: string;
+      eventDate: string;
+      description: string;
+      chairperson: string;
+    }
+  ) => Promise<void>;
   onAddMeeting: (
     committeeId: string,
     meeting: Omit<CommitteeMeeting, 'id' | 'status'>
@@ -87,9 +100,11 @@ function getCountdownLabel(dateTimeStr: string, now: Date): {
 
 export const CommitteeSection: React.FC<CommitteeSectionProps> = ({
   committees,
+  siteContent,
   now,
   canEditAdmin,
   onAddCommittee,
+  onUpdateCommittee,
   onAddMeeting,
   onUpdateMeetingStatus,
   onAddTask,
@@ -98,18 +113,20 @@ export const CommitteeSection: React.FC<CommitteeSectionProps> = ({
 }) => {
   const [selectedId, setSelectedId] = useState<string>(committees[0]?.id || '');
   const [showNewCommittee, setShowNewCommittee] = useState(false);
+  const [editingCommitteeId, setEditingCommitteeId] = useState<string | null>(null);
   const [showNewMeeting, setShowNewMeeting] = useState(false);
   const [showNewTask, setShowNewTask] = useState(false);
 
   const activeCommittee =
     committees.find((c) => c.id === selectedId) || committees[0];
 
-  const [comForm, setComForm] = useState({
+  const emptyComForm = () => ({
     name: '',
     eventDate: new Date().toISOString().slice(0, 10),
     chairperson: '',
     description: '',
   });
+  const [comForm, setComForm] = useState(emptyComForm);
 
   const defaultMeetingTime = useMemo(() => {
     const d = new Date(now.getTime() + 90 * 60 * 1000);
@@ -163,14 +180,25 @@ export const CommitteeSection: React.FC<CommitteeSectionProps> = ({
   const handleCommitteeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!comForm.name.trim()) return;
-    await onAddCommittee(comForm);
-    setComForm({
-      name: '',
-      eventDate: new Date().toISOString().slice(0, 10),
-      chairperson: '',
-      description: '',
-    });
+    if (editingCommitteeId) {
+      await onUpdateCommittee(editingCommitteeId, comForm);
+    } else {
+      await onAddCommittee(comForm);
+    }
+    setComForm(emptyComForm());
+    setEditingCommitteeId(null);
     setShowNewCommittee(false);
+  };
+
+  const handleStartEditCommittee = (committee: Committee) => {
+    setEditingCommitteeId(committee.id);
+    setComForm({
+      name: committee.name,
+      eventDate: committee.eventDate,
+      chairperson: committee.chairperson,
+      description: committee.description,
+    });
+    setShowNewCommittee(true);
   };
 
   const handleMeetingSubmit = async (e: React.FormEvent) => {
@@ -208,17 +236,28 @@ export const CommitteeSection: React.FC<CommitteeSectionProps> = ({
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-[#0F2419]">
-            Kepanitiaan, Jadwal Rapat & Pembagian Tugas
+            {siteContent?.sections.kepanitiaanTitle ||
+              DEFAULT_SITE_CONTENT.sections.kepanitiaanTitle}
           </h1>
           <p className="text-sm text-[#456051] mt-1">
-            Kelola agenda rapat panitia acara gereja, pembagian tugas tiap seksi, serta pengingat otomatis jadwal rapat.
+            {siteContent?.sections.kepanitiaanSubtitle ||
+              DEFAULT_SITE_CONTENT.sections.kepanitiaanSubtitle}
           </p>
         </div>
 
         {canEditAdmin && (
           <button
             type="button"
-            onClick={() => setShowNewCommittee((v) => !v)}
+            onClick={() => {
+              if (showNewCommittee && editingCommitteeId) {
+                setEditingCommitteeId(null);
+                setComForm(emptyComForm());
+              } else {
+                setEditingCommitteeId(null);
+                setComForm(emptyComForm());
+                setShowNewCommittee((v) => !v);
+              }
+            }}
             className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-[#146C43] hover:bg-[#0F5132] text-white text-sm font-semibold whitespace-nowrap shrink-0 cursor-pointer"
           >
             <Plus className="w-4 h-4" />
@@ -282,13 +321,15 @@ export const CommitteeSection: React.FC<CommitteeSectionProps> = ({
         )}
       </section>
 
-      {/* New Committee Form */}
+      {/* New / Edit Committee Form */}
       {canEditAdmin && showNewCommittee && (
         <form
           onSubmit={handleCommitteeSubmit}
           className="rounded-2xl border border-[#BFE0C9] bg-white p-6 space-y-4"
         >
-          <h2 className="text-lg font-bold text-[#0F2419]">Buat Kepanitiaan Acara Baru</h2>
+          <h2 className="text-lg font-bold text-[#0F2419]">
+            {editingCommitteeId ? 'Ubah Informasi Kepanitiaan' : 'Buat Kepanitiaan Acara Baru'}
+          </h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <label className="space-y-1.5 text-sm">
               <span className="font-medium text-[#0F2419]">Nama Kepanitiaan</span>
@@ -338,11 +379,15 @@ export const CommitteeSection: React.FC<CommitteeSectionProps> = ({
               type="submit"
               className="px-5 py-2.5 rounded-lg bg-[#146C43] hover:bg-[#0F5132] text-white text-sm font-semibold cursor-pointer"
             >
-              Simpan Kepanitiaan
+              {editingCommitteeId ? 'Simpan Perubahan Kepanitiaan' : 'Simpan Kepanitiaan'}
             </button>
             <button
               type="button"
-              onClick={() => setShowNewCommittee(false)}
+              onClick={() => {
+                setEditingCommitteeId(null);
+                setComForm(emptyComForm());
+                setShowNewCommittee(false);
+              }}
               className="px-5 py-2.5 rounded-lg border border-[#D4E4D8] text-[#456051] text-sm font-medium cursor-pointer"
             >
               Batal
@@ -384,6 +429,14 @@ export const CommitteeSection: React.FC<CommitteeSectionProps> = ({
             </div>
             {canEditAdmin && (
               <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => handleStartEditCommittee(activeCommittee)}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg border border-[#D4E4D8] bg-[#F5F9F6] hover:bg-[#EAF3EC] text-[#0F2419] text-xs font-semibold whitespace-nowrap cursor-pointer"
+                >
+                  <Pencil className="w-3.5 h-3.5 text-[#146C43]" />
+                  <span>Ubah Info Panitia</span>
+                </button>
                 <button
                   type="button"
                   onClick={() => setShowNewMeeting((v) => !v)}
@@ -655,7 +708,7 @@ export const CommitteeSection: React.FC<CommitteeSectionProps> = ({
                     <th className="py-3 px-4">Seksi</th>
                     <th className="py-3 px-4">Penanggung Jawab</th>
                     <th className="py-3 px-4 whitespace-nowrap">Tenggat</th>
-                    <th className="py-3 px-4">Status Progres</th>
+                    <th className="py-3 px-4">Status Kemajuan</th>
                     {canEditAdmin && <th className="py-3 px-4 text-right">Aksi</th>}
                   </tr>
                 </thead>
